@@ -1,21 +1,20 @@
 package com.fregence.fregence.controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.http.MediaType; // Düzgün import
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
-
+import com.fasterxml.jackson.databind.ObjectMapper; // Mütləq lazımdır
 import com.fregence.fregence.dto.PerfumeDTO;
 import com.fregence.fregence.entity.Perfume;
 import com.fregence.fregence.entity.Gender;
 import com.fregence.fregence.service.FileService;
 import com.fregence.fregence.service.PerfumeService;
-
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.MediaType; // MÜTLƏQ BU OLMALIDIR
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.Valid;
 import java.util.List;
 
@@ -32,25 +31,42 @@ public class PerfumeController {
         this.service = service;
     }
 
-    // 1. Siyahı və Axtarış
+    // 1. Siyahı
     @GetMapping
     public ResponseEntity<Page<PerfumeDTO>> getAll(
             @RequestParam(required = false) String query,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size,
             @RequestParam(defaultValue = "id") String sortBy) {
-        
         Pageable pageable = PageRequest.of(page, size, Sort.by(sortBy).descending());
         return ResponseEntity.ok(service.getAllPerfumes(query, pageable));
     }
 
-    // 2. Detal
+    // 2. ADMIN: Yeni ətir yaratmaq (Zəmanətli və Təhlükəsiz Üsul)
+    @PostMapping(value = "", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
+    public ResponseEntity<PerfumeDTO> create(
+            @RequestPart("perfume") String perfumeJson, // String kimi alırıq (415-in qarşısını alır)
+            @RequestPart(value = "image", required = false) MultipartFile image) throws Exception {
+        
+        // JSON stringini əllə Perfume obyektinə çeviririk
+        ObjectMapper objectMapper = new ObjectMapper();
+        Perfume perfume = objectMapper.readValue(perfumeJson, Perfume.class);
+
+        if (image != null && !image.isEmpty()) {
+            String fullCloudinaryUrl = fileService.saveImage(image);
+            perfume.setImageUrl(fullCloudinaryUrl);
+        }
+
+        return ResponseEntity.ok(service.savePerfume(perfume));
+    }
+
+    // 3. Detal
     @GetMapping("/{id}")
     public ResponseEntity<PerfumeDTO> getById(@PathVariable Long id) {
         return ResponseEntity.ok(service.getPerfumeById(id));
     }
 
-    // 3. Filtrləmə
+    // 4. Filtrləmə
     @GetMapping("/filter")
     public ResponseEntity<Page<PerfumeDTO>> filter(
             @RequestParam(required = false) String brand,
@@ -59,46 +75,28 @@ public class PerfumeController {
             @RequestParam(required = false) Double maxPrice,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size) {
-        
         Pageable pageable = PageRequest.of(page, size);
         return ResponseEntity.ok(service.filterPerfumes(brand, gender, minPrice, maxPrice, pageable));
     }
 
-    // 4. ADMIN: Yeni ətir yaratmaq (Şəkil yükləmə ilə birlikdə)
-    @PostMapping(value = "", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
-    public ResponseEntity<PerfumeDTO> create(
-            @RequestPart("perfume") @Valid Perfume perfume,
-            @RequestPart("image") MultipartFile image) throws Exception {
-        
-        if (image != null && !image.isEmpty()) {
-            // Cloudinary-dən gələn linki birbaşa mənimsədirik (təkrar artırmalar yoxdur)
-            String fullCloudinaryUrl = fileService.saveImage(image);
-            perfume.setImageUrl(fullCloudinaryUrl);
-        }
-
-        return ResponseEntity.ok(service.savePerfume(perfume));
-    }
-
-    // 5. ADMIN: Yeniləmək
+    // 5. Update
     @PutMapping("/{id}")
     public ResponseEntity<PerfumeDTO> update(@PathVariable Long id, @RequestBody Perfume perfume) {
         return ResponseEntity.ok(service.updatePerfume(id, perfume));
     }
 
-    // 6. ADMIN: Silmək
+    // 6. Delete
     @DeleteMapping("/{id}")
     public ResponseEntity<String> delete(@PathVariable Long id) {
         service.deletePerfume(id);
-        return ResponseEntity.ok("Perfume deleted successfully with id: " + id);
+        return ResponseEntity.ok("Perfume deleted: " + id);
     }
-    
-    // 7. Tövsiyələr
+
     @GetMapping("/recommendations")
     public ResponseEntity<List<PerfumeDTO>> getRecommendations() {
         return ResponseEntity.ok(service.getRecommendedPerfumes());
     }
 
-    // 8. Oxşar ətirlər
     @GetMapping("/{id}/related")
     public ResponseEntity<List<PerfumeDTO>> getRelated(@PathVariable Long id) {
         return ResponseEntity.ok(service.getRelatedPerfumes(id));
