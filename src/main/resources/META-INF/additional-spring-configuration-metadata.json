@@ -1,5 +1,27 @@
-{"properties": [{
-  "name": "app.jwt.secret",
-  "type": "java.lang.String",
-  "description": "A description for 'app.jwt.secret'"
-}]}
+{"properties": [
+  {
+    "name": "app.jwt.secret",
+    "type": "java.lang.String",
+    "description": "A description for 'app.jwt.secret'"
+  },
+  {
+    "name": "CLOUDINARY_NAME",
+    "type": "java.lang.String",
+    "description": "A description for 'CLOUDINARY_NAME'"
+  },
+  {
+    "name": "CLOUDINARY_API_SECRET",
+    "type": "java.lang.String",
+    "description": "A description for 'CLOUDINARY_API_SECRET'"
+  },
+  {
+    "name": "CLOUDINARY_API_KEY",
+    "type": "java.lang.String",
+    "description": "A description for 'CLOUDINARY_API_KEY'"
+  },
+  {
+    "name": "app.cloudinary.cloud-name",
+    "type": "java.lang.String",
+    "description": "A description for 'app.cloudinary.cloud-name'"
+  }
+]}
