@@ -1,5 +1,7 @@
 package com.fregence.fregence.service;
 
+import java.io.IOException;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -13,10 +15,13 @@ import com.fregence.fregence.repository.PerfumeRepository;
 @Service
 public class PerfumeService {
 
+    private final FileService fileService;
+
     private final PerfumeRepository repository;
 
-    public PerfumeService(PerfumeRepository repository) {
+    public PerfumeService(PerfumeRepository repository, FileService fileService) {
         this.repository = repository;
+        this.fileService = fileService;
     }
 
     // 1. Yeni ətir əlavə etmək (DTO qaytarır)
@@ -68,10 +73,19 @@ public class PerfumeService {
     // 5. Ətiri silmək
     @Transactional
     public void deletePerfume(Long id) {
-        if (!repository.existsById(id)) {
-            throw new RuntimeException("Perfume not found with id: " + id);
+        Perfume perfume = repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Perfume not found"));
+
+        // 1. Cloudinary-dən şəkli silirik
+        try {
+            fileService.deleteImage(perfume.getImagePublicId());
+        } catch (IOException e) {
+            // Şəkil silinməsə belə bazadan silməyə davam etsin (opsional)
+            System.out.println("Cloudinary-dən şəkil silinərkən xəta: " + e.getMessage());
         }
-        repository.deleteById(id);
+
+        // 2. Bazadan (PostgreSQL) silirik
+        repository.delete(perfume);
     }
 
     // 6. Filtr Metodu (Page<DTO> qaytarır)

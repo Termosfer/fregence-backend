@@ -16,7 +16,7 @@ public class Perfume {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
+    private String imagePublicId; // Cloudinary-dən şəkli silmək üçün lazım olan ID
     private String brand;
     private String name;
     private String description;

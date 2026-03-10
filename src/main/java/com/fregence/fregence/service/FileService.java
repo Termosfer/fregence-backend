@@ -16,15 +16,24 @@ public class FileService {
     @Autowired
     private Cloudinary cloudinary;
 
-    public String saveImage(MultipartFile file) throws IOException {
+ // 1. Şəkli yükləyir və məlumatları Map kimi qaytarır
+    public Map<String, String> uploadImage(MultipartFile file) throws IOException {
         if (file.isEmpty()) return null;
 
-        // Şəkli buluda yükləyirik
-        Map uploadResult = cloudinary.uploader().upload(file.getBytes(), ObjectUtils.asMap(
-                "folder", "fregence/perfumes" // Cloudinary daxilində qovluq adı
+        Map<?, ?> uploadResult = cloudinary.uploader().upload(file.getBytes(), ObjectUtils.asMap(
+                "folder", "fregence/perfumes"
         ));
 
-        // Cloudinary-nin bizə verdiyi daimi linki qaytarırıq (https://res.cloudinary.com/...)
-        return uploadResult.get("secure_url").toString();
+        return Map.of(
+            "url", uploadResult.get("secure_url").toString(),
+            "public_id", uploadResult.get("public_id").toString()
+        );
+    }
+
+    // 2. Şəkli Cloudinary-dən silir
+    public void deleteImage(String publicId) throws IOException {
+        if (publicId != null && !publicId.isEmpty()) {
+            cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
+        }
     }
 }

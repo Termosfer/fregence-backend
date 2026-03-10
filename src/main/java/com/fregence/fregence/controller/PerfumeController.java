@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/perfumes")
@@ -43,18 +44,20 @@ public class PerfumeController {
     }
 
     // 2. ADMIN: Yeni ətir yaratmaq (Zəmanətli və Təhlükəsiz Üsul)
+ // PerfumeController.java - create metodu
     @PostMapping(value = "", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
     public ResponseEntity<PerfumeDTO> create(
-            @RequestPart("perfume") String perfumeJson, // String kimi alırıq (415-in qarşısını alır)
+            @RequestPart("perfume") String perfumeJson,
             @RequestPart(value = "image", required = false) MultipartFile image) throws Exception {
         
-        // JSON stringini əllə Perfume obyektinə çeviririk
         ObjectMapper objectMapper = new ObjectMapper();
         Perfume perfume = objectMapper.readValue(perfumeJson, Perfume.class);
 
         if (image != null && !image.isEmpty()) {
-            String fullCloudinaryUrl = fileService.saveImage(image);
-            perfume.setImageUrl(fullCloudinaryUrl);
+            // İndi bizə həm URL, həm ID gəlir
+            Map<String, String> imageData = fileService.uploadImage(image);
+            perfume.setImageUrl(imageData.get("url"));
+            perfume.setImagePublicId(imageData.get("public_id")); // ID-ni bazaya yazırıq
         }
 
         return ResponseEntity.ok(service.savePerfume(perfume));
