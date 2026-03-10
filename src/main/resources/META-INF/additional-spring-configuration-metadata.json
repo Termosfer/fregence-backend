@@ -23,5 +23,10 @@
     "name": "app.cloudinary.cloud-name",
     "type": "java.lang.String",
     "description": "A description for 'app.cloudinary.cloud-name'"
+  },
+  {
+    "name": "app.cloudinary.api-secret",
+    "type": "java.lang.String",
+    "description": "A description for 'app.cloudinary.api-secret'"
   }
 ]}
