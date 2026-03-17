@@ -39,7 +39,7 @@ public class PerfumeService {
 
 	// 2. Bütün ətirləri və ya axtarışa görə gətirmək (Page<DTO> qaytarır)
 	// 1. Siyahını gətirəndə Redis-ə bax, yoxdursa bazadan götür və Redis-ə qoy
-	@Cacheable(value = "perfumes", key = "(#query ?: 'default') + '-' + #pageable.pageNumber")
+	@Cacheable(value = "perfumes", key = "(#query ?: 'default') + '-' + #pageable.pageNumber + '-' + #pageable.pageSize")
 	public PagedResponse<PerfumeDTO> getAllPerfumes(String query, Pageable pageable) {
 	    Page<Perfume> perfumes;
 	    if (query != null && !query.isEmpty()) {
@@ -109,7 +109,7 @@ public class PerfumeService {
 
 	
 	// 6. Filtr Metodu (PagedResponse qaytarır və Redis-də keşlənir)
-	@Cacheable(value = "perfumes", key = "'filter-' + (#brand ?: 'all') + '-' + (#gender ?: 'all') + '-' + (#minPrice ?: '0') + '-' + (#maxPrice ?: 'max') + '-' + #pageable.pageNumber")
+	@Cacheable(value = "perfumes", key = "'filter-' + (#brand ?: 'all') + '-' + (#gender ?: 'all') + '-' + (#minPrice ?: '0') + '-' + (#maxPrice ?: 'max') + '-' + #pageable.pageNumber ")
 	public PagedResponse<PerfumeDTO> filterPerfumes(String brand, Gender gender, Double minPrice, Double maxPrice, Pageable pageable) {
 	    
 	    // 1. Bazadan Page<Perfume> (Entity) gətiririk
