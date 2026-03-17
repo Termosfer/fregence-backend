@@ -11,7 +11,7 @@ import com.fregence.fregence.entity.Wishlist;
 @Repository
 public interface WishlistRepository extends JpaRepository<Wishlist, Long> {
     List<Wishlist> findByUser(User user);
-    
+    long countByUser(User user);
     // Eyni ətir siyahıda artıq varmı? (Təkrarın qarşısını almaq üçün)
     boolean existsByUserAndPerfume(User user, Perfume perfume);
     

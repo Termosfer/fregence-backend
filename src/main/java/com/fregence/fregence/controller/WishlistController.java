@@ -25,6 +25,13 @@ public class WishlistController {
         return ResponseEntity.ok(wishlistService.getMyWishlist());
     }
 
+ // WishlistController.java daxilinə əlavə et:
+
+    @GetMapping("/count")
+    public ResponseEntity<Long> getCount() {
+        return ResponseEntity.ok(wishlistService.getWishlistCount());
+    }
+    
     @PostMapping("/add/{perfumeId}")
     public ResponseEntity<String> add(@PathVariable Long perfumeId) {
         wishlistService.addToWishlist(perfumeId);

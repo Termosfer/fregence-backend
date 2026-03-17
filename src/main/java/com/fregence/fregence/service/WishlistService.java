@@ -20,6 +20,11 @@ public class WishlistService {
     @Autowired private PerfumeRepository perfumeRepository;
     @Autowired private UserService userService;
 
+    public long getWishlistCount() {
+        User user = userService.getCurrentUser();
+        return wishlistRepository.countByUser(user);
+    }
+    
     // 1. Siyahını gətirmək (Xəta verən hissə)
     public List<PerfumeDTO> getMyWishlist() {
         User user = userService.getCurrentUser();
