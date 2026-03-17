@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.fregence.fregence.entity.Perfume;
 import com.fregence.fregence.entity.Gender;
+import com.fregence.fregence.dto.PagedResponse;
 import com.fregence.fregence.dto.PerfumeDTO; // DTO importu mütləqdir
 import com.fregence.fregence.repository.PerfumeRepository;
 
@@ -39,14 +40,25 @@ public class PerfumeService {
 	// 2. Bütün ətirləri və ya axtarışa görə gətirmək (Page<DTO> qaytarır)
 	// 1. Siyahını gətirəndə Redis-ə bax, yoxdursa bazadan götür və Redis-ə qoy
 	@Cacheable(value = "perfumes", key = "(#query ?: 'default') + '-' + #pageable.pageNumber")
-	public Page<PerfumeDTO> getAllPerfumes(String query, Pageable pageable) {
-		Page<Perfume> perfumes;
-		if (query != null && !query.isEmpty()) {
-			perfumes = repository.findByNameContainingIgnoreCaseOrBrandContainingIgnoreCase(query, query, pageable);
-		} else {
-			perfumes = repository.findAll(pageable);
-		}
-		return perfumes.map(this::convertToDto);
+	public PagedResponse<PerfumeDTO> getAllPerfumes(String query, Pageable pageable) {
+	    Page<Perfume> perfumes;
+	    if (query != null && !query.isEmpty()) {
+	        perfumes = repository.findByNameContainingIgnoreCaseOrBrandContainingIgnoreCase(query, query, pageable);
+	    } else {
+	        perfumes = repository.findAll(pageable);
+	    }
+
+	    // Page-i PagedResponse-a çeviririk
+	    Page<PerfumeDTO> dtoPage = perfumes.map(this::convertToDto);
+	    
+	    return new PagedResponse<>(
+	        dtoPage.getContent(),
+	        dtoPage.getNumber(),
+	        dtoPage.getSize(),
+	        dtoPage.getTotalElements(),
+	        dtoPage.getTotalPages(),
+	        dtoPage.isLast()
+	    );
 	}
 
 	// 3. ID-yə görə tək bir ətir (DTO qaytarır)
@@ -95,11 +107,26 @@ public class PerfumeService {
 		repository.delete(perfume);
 	}
 
-	// 6. Filtr Metodu (Page<DTO> qaytarır)
-	public Page<PerfumeDTO> filterPerfumes(String brand, Gender gender, Double minPrice, Double maxPrice,
-			Pageable pageable) {
-		Page<Perfume> perfumes = repository.filterPerfumes(brand, gender, minPrice, maxPrice, pageable);
-		return perfumes.map(this::convertToDto);
+	
+	// 6. Filtr Metodu (PagedResponse qaytarır və Redis-də keşlənir)
+	@Cacheable(value = "perfumes", key = "'filter-' + (#brand ?: 'all') + '-' + (#gender ?: 'all') + '-' + (#minPrice ?: '0') + '-' + (#maxPrice ?: 'max') + '-' + #pageable.pageNumber")
+	public PagedResponse<PerfumeDTO> filterPerfumes(String brand, Gender gender, Double minPrice, Double maxPrice, Pageable pageable) {
+	    
+	    // 1. Bazadan Page<Perfume> (Entity) gətiririk
+	    Page<Perfume> perfumes = repository.filterPerfumes(brand, gender, minPrice, maxPrice, pageable);
+	    
+	    // 2. Entity-ləri DTO-ya çeviririk
+	    Page<PerfumeDTO> dtoPage = perfumes.map(this::convertToDto);
+	    
+	    // 3. PagedResponse obyektinə büküb qaytarırıq
+	    return new PagedResponse<>(
+	        dtoPage.getContent(),
+	        dtoPage.getNumber(),
+	        dtoPage.getSize(),
+	        dtoPage.getTotalElements(),
+	        dtoPage.getTotalPages(),
+	        dtoPage.isLast()
+	    );
 	}
 
 	public java.util.List<PerfumeDTO> getRecommendedPerfumes() {
