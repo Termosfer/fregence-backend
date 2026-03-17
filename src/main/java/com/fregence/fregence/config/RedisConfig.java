@@ -1,6 +1,10 @@
 package com.fregence.fregence.config;
 
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.jsontype.impl.LntClassNameIdResolver;
+import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
+import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,17 +19,20 @@ public class RedisConfig {
 
     @Bean
     RedisCacheConfiguration cacheConfiguration() {
-        // Jackson üçün təmiz bir ObjectMapper yaradırıq
         ObjectMapper mapper = new ObjectMapper();
-        
-        // Java 8 Tarix/Vaxt dəstəyini əlavə edirik
         mapper.registerModule(new JavaTimeModule());
+
+        // VACİB: Bu hissə Jackson-a klass adlarını JSON-un içinə yazmağı tapşırır
+        PolymorphicTypeValidator ptv = BasicPolymorphicTypeValidator.builder()
+                .allowIfBaseType(Object.class)
+                .build();
         
-        // Məlumatların JSON kimi yazılması üçün serializer hazırlayırıq
+        mapper.activateDefaultTyping(ptv, ObjectMapper.DefaultTyping.NON_FINAL, JsonTypeInfo.As.PROPERTY);
+
         GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer(mapper);
 
         return RedisCacheConfiguration.defaultCacheConfig()
-                .entryTtl(Duration.ofHours(1)) // 1 saatlıq keş ömrü
+                .entryTtl(Duration.ofHours(1))
                 .disableCachingNullValues()
                 .serializeValuesWith(RedisSerializationContext.SerializationPair
                         .fromSerializer(serializer));
