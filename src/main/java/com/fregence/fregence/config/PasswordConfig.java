@@ -68,7 +68,7 @@ public class PasswordConfig {
 						.requestMatchers(HttpMethod.GET, "/api/perfumes", "/api/perfumes/", "/api/perfumes/**",
 								"/api/perfumes/recommendations", "/api/perfumes/*/related")
 						.permitAll()
-
+						.requestMatchers(HttpMethod.GET, "/api/perfumes/brands").permitAll()
 						// POST, PUT, DELETE: Yalnız ADMIN
 						.requestMatchers(HttpMethod.POST, "/api/perfumes", "/api/perfumes/").hasRole("ADMIN")
 						.requestMatchers(HttpMethod.PUT, "/api/perfumes/**").hasRole("ADMIN")
