@@ -104,4 +104,8 @@ public class PerfumeController {
     public ResponseEntity<List<PerfumeDTO>> getRelated(@PathVariable Long id) {
         return ResponseEntity.ok(service.getRelatedPerfumes(id));
     }
+    @GetMapping("/brands")
+    public ResponseEntity<List<String>> getBrands() {
+        return ResponseEntity.ok(service.getAllBrands());
+    }
 }

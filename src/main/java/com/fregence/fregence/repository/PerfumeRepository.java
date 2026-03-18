@@ -48,4 +48,8 @@ public interface PerfumeRepository extends JpaRepository<Perfume, Long> {
 
     // 2. Oxşar ətirləri gətir (Eyni brenddən olan 4 dənə ətir, amma baxılan ətir özü siyahıda olmasın)
     java.util.List<Perfume> findTop4ByBrandAndIdNot(String brand, Long id);
+    
+ // Bütün unikal brendləri əlifba sırası ilə gətirir
+    @Query("SELECT DISTINCT p.brand FROM Perfume p ORDER BY p.brand ASC")
+    List<String> findUniqueBrands();
 }

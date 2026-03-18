@@ -1,6 +1,7 @@
 package com.fregence.fregence.service;
 
 import java.io.IOException;
+import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -61,6 +62,12 @@ public class PerfumeService {
 	    );
 	}
 
+	// Brendləri gətirir və Redis-də keşləyir
+	@Cacheable(value = "perfumes", key = "'all-brands'")
+	public List<String> getAllBrands() {
+	    return repository.findUniqueBrands();
+	}
+	
 	// 3. ID-yə görə tək bir ətir (DTO qaytarır)
 	public PerfumeDTO getPerfumeById(Long id) {
 		Perfume perfume = repository.findById(id)
