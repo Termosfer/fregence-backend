@@ -33,15 +33,16 @@ public interface PerfumeRepository extends JpaRepository<Perfume, Long> {
 
     // 7. Professional Bonus: Çoxlu filtr (Eyni anda Brend, Gender və Qiymət yoxlaması üçün)
     @Query("SELECT p FROM Perfume p WHERE " +
-           "(:brand IS NULL OR LOWER(p.brand) = LOWER(:brand)) AND " +
-           "(:gender IS NULL OR p.gender = :gender) AND " +
-           "(:minPrice IS NULL OR p.price >= :minPrice) AND " +
-           "(:maxPrice IS NULL OR p.price <= :maxPrice)")
-    Page<Perfume> filterPerfumes(@Param("brand") String brand, 
-                                 @Param("gender") Gender gender, 
-                                 @Param("minPrice") Double minPrice, 
-                                 @Param("maxPrice") Double maxPrice, 
-                                 Pageable pageable);
+    	       "(:brand IS NULL OR p.brand = :brand) AND " + 
+    	       "(:gender IS NULL OR p.gender = :gender) AND " +
+    	       "(:minPrice IS NULL OR p.price >= :minPrice) AND " +
+    	       "(:maxPrice IS NULL OR p.price <= :maxPrice)")
+    	Page<Perfume> filterPerfumes(
+    	    @Param("brand") String brand, 
+    	    @Param("gender") Gender gender, 
+    	    @Param("minPrice") Double minPrice, 
+    	    @Param("maxPrice") Double maxPrice, 
+    	    Pageable pageable);
     
  // 1. Tövsiyə olunanları gətir (Məsələn: Ana səhifə slaydşousu üçün)
     java.util.List<Perfume> findByIsRecommendedTrue();
