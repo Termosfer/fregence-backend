@@ -72,9 +72,13 @@ public class PerfumeController {
 	public ResponseEntity<PagedResponse<PerfumeDTO>> filter(@RequestParam(required = false) String brand,
 			@RequestParam(required = false) Gender gender, @RequestParam(required = false) Double minPrice,
 			@RequestParam(required = false) Double maxPrice, @RequestParam(defaultValue = "0") int page,
-			@RequestParam(defaultValue = "12") int size) {
-
-		Pageable pageable = PageRequest.of(page, size);
+			@RequestParam(defaultValue = "12") int size, @RequestParam(defaultValue = "id") String sortBy, // <--- Əlavə
+																											// edildi
+			@RequestParam(defaultValue = "desc") String direction // <--- Əlavə edildi
+	) {
+		// Sıralama məntiqini bura da əlavə edirik
+		Sort sort = direction.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+		Pageable pageable = PageRequest.of(page, size, sort);
 		return ResponseEntity.ok(service.filterPerfumes(brand, gender, minPrice, maxPrice, pageable));
 	}
 
