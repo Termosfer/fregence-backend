@@ -117,7 +117,7 @@ public class PerfumeService {
 	
 	// 6. Filtr Metodu (PagedResponse qaytarır və Redis-də keşlənir)
 	@Cacheable(value = "perfumes", 
-	           key = "'filter-' + (#brand ?: 'all') + '-' + (#gender ?: 'all') + '-' + (#minPrice ?: '0') + '-' + (#maxPrice ?: 'max') + '-' + #pageable.pageNumber + '-' + #pageable.pageSize")
+	           key = "'filter-' + (#brand ?: 'all') + '-' + (#gender ?: 'all') + '-' + (#minPrice ?: '0') + '-' + (#maxPrice ?: 'max') + '-' + #pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort.toString()")
 	public PagedResponse<PerfumeDTO> filterPerfumes(String brand, Gender gender, Double minPrice, Double maxPrice, Pageable pageable) {
 	    
 	    // 1. Bazadan Page<Perfume> (Entity) gətiririk
