@@ -35,9 +35,12 @@ public class PasswordConfig {
 	@Bean
 	CorsConfigurationSource corsConfigurationSource() {
 		CorsConfiguration configuration = new CorsConfiguration();
-		configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173")); // Frontend ünvanın
+		configuration.setAllowedOrigins(
+				Arrays.asList("http://localhost:5173", "http://127.0.0.1:5173", "https://miparfume.netlify.app")); // Frontend
+																													// ünvanın
 		configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-		configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
+		configuration.setAllowedHeaders(
+				Arrays.asList("Authorization", "Content-Type", "Accept", "X-Requested-With", "Cache-Control"));
 		configuration.setAllowCredentials(true);
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 		source.registerCorsConfiguration("/**", configuration);
@@ -58,8 +61,8 @@ public class PasswordConfig {
 						.requestMatchers("/api/orders/admin/**").hasRole("ADMIN")
 						.requestMatchers("/api/admin/dashboard/**").hasRole("ADMIN")
 						.requestMatchers("/api/orders/checkout").hasAnyRole("USER", "ADMIN")
-						.requestMatchers("/api/wishlist/**").hasAnyRole("USER", "ADMIN")
-						.requestMatchers("/uploads/**").permitAll()
+						.requestMatchers("/api/wishlist/**").hasAnyRole("USER", "ADMIN").requestMatchers("/uploads/**")
+						.permitAll()
 						// Auth endpoints açıqdır (Login/Register)
 						.requestMatchers("/api/auth/**").permitAll().requestMatchers("/error").permitAll()
 						.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
@@ -67,8 +70,7 @@ public class PasswordConfig {
 						// GET: Hamı baxa bilsin (Ana yol, slash-li yol və bütün alt yollar)
 						.requestMatchers(HttpMethod.GET, "/api/perfumes", "/api/perfumes/", "/api/perfumes/**",
 								"/api/perfumes/recommendations", "/api/perfumes/*/related")
-						.permitAll()
-						.requestMatchers(HttpMethod.GET, "/api/perfumes/brands").permitAll()
+						.permitAll().requestMatchers(HttpMethod.GET, "/api/perfumes/brands").permitAll()
 						// POST, PUT, DELETE: Yalnız ADMIN
 						.requestMatchers(HttpMethod.POST, "/api/perfumes", "/api/perfumes/").hasRole("ADMIN")
 						.requestMatchers(HttpMethod.PUT, "/api/perfumes/**").hasRole("ADMIN")
