@@ -1,7 +1,5 @@
 package com.fregence.fregence.service;
 
-
-
 import java.util.List;
 import java.util.Optional;
 
@@ -23,7 +21,6 @@ import jakarta.transaction.Transactional;
 @Service
 public class CartService {
 
-    
 	@Autowired
 	private CartRepository cartRepository;
 	@Autowired
@@ -33,7 +30,6 @@ public class CartService {
 	@Autowired
 	private UserService userService;
 
-   
 	// 1. Hazırkı istifadəçinin səbətini tap və ya yarat
 	public Cart getOrCreateCart() {
 		User user = userService.getCurrentUser();
@@ -79,7 +75,7 @@ public class CartService {
 					: item.getPerfume().getPrice();
 
 			return new CartItemDTO(item.getId(), item.getPerfume().getId(), item.getPerfume().getName(),
-					item.getPerfume().getBrand(), price, item.getQuantity(), price * item.getQuantity());
+					item.getPerfume().getBrand(), price, item.getQuantity(), price * item.getQuantity(),item.getPerfume().getImageUrl());
 		}).toList();
 
 		Double total = itemDtos.stream().mapToDouble(CartItemDTO::getSubTotal).sum();
@@ -93,20 +89,21 @@ public class CartService {
 	// 4. Səbətdən məhsul sil
 	@Transactional
 	public void removeItem(Long itemId) {
-	    // 1. Hazırkı login olan istifadəçinin səbətini tapırıq
-	    Cart cart = getOrCreateCart(); 
+		// 1. Hazırkı login olan istifadəçinin səbətini tapırıq
+		Cart cart = getOrCreateCart();
 
-	    // 2. Silinmək istəyən məhsulu tapırıq
-	    CartItem item = itemRepository.findById(itemId)
-	            .orElseThrow(() -> new RuntimeException("Səbətdə belə bir məhsul tapılmadı."));
+		// 2. Silinmək istəyən məhsulu tapırıq
+		CartItem item = itemRepository.findById(itemId)
+				.orElseThrow(() -> new RuntimeException("Səbətdə belə bir məhsul tapılmadı."));
 
-	    // 3. TƏHLÜKƏSİZLİK Yoxlaması: Bu məhsul həqiqətən bu istifadəçinin səbətindədirmi?
-	    // Beləliklə, istifadəçi A, istifadəçi B-nin məhsulunu silə bilməz.
-	    if (!item.getCart().getId().equals(cart.getId())) {
-	        throw new RuntimeException("Bu məhsulu silmək icazəniz yoxdur!");
-	    }
+		// 3. TƏHLÜKƏSİZLİK Yoxlaması: Bu məhsul həqiqətən bu istifadəçinin
+		// səbətindədirmi?
+		// Beləliklə, istifadəçi A, istifadəçi B-nin məhsulunu silə bilməz.
+		if (!item.getCart().getId().equals(cart.getId())) {
+			throw new RuntimeException("Bu məhsulu silmək icazəniz yoxdur!");
+		}
 
-	    // 4. Hər şey qaydasındadırsa, silirik
-	    itemRepository.delete(item);
+		// 4. Hər şey qaydasındadırsa, silirik
+		itemRepository.delete(item);
 	}
 }

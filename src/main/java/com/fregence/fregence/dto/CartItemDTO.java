@@ -15,4 +15,5 @@ public class CartItemDTO {
 	private Double price; // Endirim varsa endirimli qiymət
 	private Integer quantity;
 	private Double subTotal; // price * quantity
+	private String imageUrl;
 }
