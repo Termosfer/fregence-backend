@@ -15,4 +15,5 @@ public class OrderItemDTO {
     private Double price;
     private Integer quantity;
     private Double subTotal;
+    private String imageUrl;
 }

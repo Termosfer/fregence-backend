@@ -112,17 +112,23 @@ public class OrderService {
 
         // Item-ləri DTO-ya çeviririk
         if (order.getOrderItems() != null) {
-            List<OrderItemDTO> itemDtos = order.getOrderItems().stream().map(item -> 
-                new OrderItemDTO(
-                    item.getId(), 
-                    item.getPerfume() != null ? item.getPerfume().getId() : null, 
-                    item.getPerfumeName(), 
-                    null, 
-                    item.getPriceAtPurchase(), 
-                    item.getQuantity(), 
-                    item.getPriceAtPurchase() * item.getQuantity()
-                )
-            ).toList();
+            List<OrderItemDTO> itemDtos = order.getOrderItems().stream().map(item -> {
+                OrderItemDTO idto = new OrderItemDTO();
+                idto.setId(item.getId());
+                idto.setPerfumeId(item.getPerfume() != null ? item.getPerfume().getId() : null);
+                idto.setPerfumeName(item.getPerfumeName());
+                
+                // BURA DIQQƏT: Brend və Şəkli 'Perfume' obyektindən götürürük
+                if (item.getPerfume() != null) {
+                    idto.setBrand(item.getPerfume().getBrand());
+                    idto.setImageUrl(item.getPerfume().getImageUrl());
+                }
+
+                idto.setPrice(item.getPriceAtPurchase());
+                idto.setQuantity(item.getQuantity());
+                idto.setSubTotal(item.getPriceAtPurchase() * item.getQuantity());
+                return idto;
+            }).toList();
             dto.setItems(itemDtos);
         } else {
             dto.setItems(new ArrayList<>());
