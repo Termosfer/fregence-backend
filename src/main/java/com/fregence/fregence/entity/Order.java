@@ -24,6 +24,6 @@ public class Order {
     private String status; // Məs: "PENDING", "COMPLETED"
     private LocalDateTime preferredDeliveryTime; // Təqvimdən gələn dəqiq tarix və saat
     private String orderNote;  
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<OrderItem> orderItems = new ArrayList<>();
 }
