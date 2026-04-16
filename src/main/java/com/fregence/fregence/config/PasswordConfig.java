@@ -38,9 +38,10 @@ public class PasswordConfig {
 		configuration.setAllowedOrigins(
 				Arrays.asList("http://localhost:5173", "http://127.0.0.1:5173", "https://miparfume.netlify.app")); // Frontend
 																													// ünvanın
-		configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+		configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 		configuration.setAllowedHeaders(
-				Arrays.asList("Authorization", "Content-Type", "Accept", "X-Requested-With", "Cache-Control"));
+				Arrays.asList("Authorization", "Content-Type", "Accept", "X-Requested-With", "Cache-Control","Access-Control-Request-Method",
+				        "Access-Control-Request-Headers"));
 		configuration.setAllowCredentials(true);
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 		source.registerCorsConfiguration("/**", configuration);
@@ -67,6 +68,9 @@ public class PasswordConfig {
 						// Auth endpoints açıqdır (Login/Register)
 						.requestMatchers("/api/auth/**").permitAll().requestMatchers("/error").permitAll()
 						.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+						
+						// BU SƏTRI ƏLAVƏ ET (Options sorğuları üçün):
+			            .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
 						// ===== PERFUMES (ƏTİRLƏR) =====
 						// GET: Hamı baxa bilsin (Ana yol, slash-li yol və bütün alt yollar)
 						.requestMatchers(HttpMethod.GET, "/api/perfumes", "/api/perfumes/", "/api/perfumes/**",
