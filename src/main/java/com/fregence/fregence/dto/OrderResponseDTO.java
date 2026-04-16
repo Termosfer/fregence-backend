@@ -16,5 +16,11 @@ public class OrderResponseDTO {
     private String status;
     private LocalDateTime orderDate;
     private LocalDateTime preferredDeliveryTime;
+    
+    private String courierName;
+    private String courierPhone;
+    private LocalDateTime estimatedDeliveryTime;
+    
     private List<OrderItemDTO> items;
+    
 }

@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -21,6 +22,17 @@ public class OrderController {
 	 @Autowired 
 	 private OrderService orderService;
 
+	 @PatchMapping("/admin/{id}/ship")
+	 public ResponseEntity<String> shipOrder(
+	         @PathVariable Long id,
+	         @RequestParam String courierName,
+	         @RequestParam String courierPhone,
+	         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime estimatedTime) {
+	     
+	     orderService.shipOrder(id, courierName, courierPhone, estimatedTime);
+	     return ResponseEntity.ok("Sifariş kuryerə verildi və status yeniləndi.");
+	 }
+	 
 	 @PostMapping("/checkout")
 	 public ResponseEntity<String> checkout(
 	         @RequestParam String address, 

@@ -24,6 +24,15 @@ public class Order {
     private String status; // Məs: "PENDING", "COMPLETED"
     private LocalDateTime preferredDeliveryTime; // Təqvimdən gələn dəqiq tarix və saat
     private String orderNote;  
+    
+    private String courierName;       // Kuryerin adı
+    private String courierPhone;      // Kuryerin əlaqə nömrəsi
+    private LocalDateTime estimatedDeliveryTime; // Təxmini çatdırılma vaxtı (Admin tərəfindən təyin olunur)
+    
+    
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<OrderItem> orderItems = new ArrayList<>();
+    
+    
+    
 }
