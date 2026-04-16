@@ -97,6 +97,22 @@ public class OrderService {
         orderRepository.save(order);
     }
 
+    @Transactional
+    public void shipOrder(Long orderId, String courierName, String courierPhone, LocalDateTime estimatedTime) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Sifariş tapılmadı"));
+
+        order.setStatus("SHIPPED"); // Statusu avtomatik yola düşdü edirik
+        order.setCourierName(courierName);
+        order.setCourierPhone(courierPhone);
+        order.setEstimatedDeliveryTime(estimatedTime);
+
+        orderRepository.save(order);
+        
+        // Gələcəkdə bura müştəriyə "Kuryer yoldadır" emaili göndərməyi də əlavə edə bilərsən
+    }
+    
+    
     private OrderResponseDTO convertToResponseDTO(Order order) {
         OrderResponseDTO dto = new OrderResponseDTO();
         dto.setId(order.getId());
@@ -110,6 +126,11 @@ public class OrderService {
         dto.setOrderDate(order.getOrderDate());
         dto.setPreferredDeliveryTime(order.getPreferredDeliveryTime());
 
+        // Kuryer məlumatlarını bura əlavə edirik:
+        dto.setCourierName(order.getCourierName());
+        dto.setCourierPhone(order.getCourierPhone());
+        dto.setEstimatedDeliveryTime(order.getEstimatedDeliveryTime());
+        
         // Item-ləri DTO-ya çeviririk
         if (order.getOrderItems() != null) {
             List<OrderItemDTO> itemDtos = order.getOrderItems().stream().map(item -> {
