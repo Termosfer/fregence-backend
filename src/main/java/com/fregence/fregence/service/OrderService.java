@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import com.fregence.fregence.dto.OrderItemDTO;
@@ -13,6 +14,7 @@ import com.fregence.fregence.entity.Cart;
 import com.fregence.fregence.entity.CartItem;
 import com.fregence.fregence.entity.Order;
 import com.fregence.fregence.entity.OrderItem;
+import com.fregence.fregence.entity.User;
 import com.fregence.fregence.repository.CartRepository;
 import com.fregence.fregence.repository.OrderRepository;
 
@@ -23,10 +25,15 @@ public class OrderService {
 
     @Autowired
     private OrderRepository orderRepository;
+    
     @Autowired
     private CartService cartService;
+    
     @Autowired
     private CartRepository cartRepository;
+
+    @Autowired
+    private UserService userService; 
 
     @Transactional
     public void placeOrder(String address, String phoneNumber, LocalDateTime preferredTime, String note) {
@@ -37,7 +44,6 @@ public class OrderService {
             throw new RuntimeException("Çatdırılma vaxtı keçmiş tarix ola bilməz!");
         }
 
-        // 1. Sifariş obyektini yaradırıq
         Order order = new Order();
         order.setUser(cart.getUser());
         order.setAddress(address);
@@ -47,16 +53,14 @@ public class OrderService {
         order.setOrderDate(LocalDateTime.now());
         order.setStatus("PENDING");
 
-        // 2. Məhsulları köçürmə məntiqi (BURA ƏLAVƏ EDİLDİ)
         List<OrderItem> orderItems = new ArrayList<>();
         double total = 0;
 
         for (CartItem cartItem : cart.getItems()) {
             OrderItem orderItem = new OrderItem();
-            orderItem.setOrder(order); // Vacib: Item-i sifarişə bağlayırıq
+            orderItem.setOrder(order);
             orderItem.setPerfume(cartItem.getPerfume());
             
-            // Adı və qiyməti "dondururuq" (Snapshot)
             String fullName = cartItem.getPerfume().getBrand() + " " + cartItem.getPerfume().getName();
             orderItem.setPerfumeName(fullName);
             
@@ -70,20 +74,16 @@ public class OrderService {
             total += price * cartItem.getQuantity();
         }
 
-        // 3. Sifarişin içini doldururuq
         order.setOrderItems(orderItems);
         order.setTotalAmount(total);
-
-        // 4. Sifarişi bazaya yazırıq
         orderRepository.save(order);
         
-        // 5. Səbəti təmizləyirik
         cart.getItems().clear();
         cartRepository.save(cart);
     }
     
     public List<OrderResponseDTO> getAllOrdersForAdmin() {
-        return orderRepository.findAll(org.springframework.data.domain.Sort.by("orderDate").descending())
+        return orderRepository.findAll(Sort.by("orderDate").descending())
                 .stream()
                 .map(this::convertToResponseDTO)
                 .toList();
@@ -102,17 +102,27 @@ public class OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Sifariş tapılmadı"));
 
-        order.setStatus("SHIPPED"); // Statusu avtomatik yola düşdü edirik
+        order.setStatus("SHIPPED"); 
         order.setCourierName(courierName);
         order.setCourierPhone(courierPhone);
         order.setEstimatedDeliveryTime(estimatedTime);
 
         orderRepository.save(order);
-        
-        // Gələcəkdə bura müştəriyə "Kuryer yoldadır" emaili göndərməyi də əlavə edə bilərsən
     }
     
-    
+    // MÜŞTƏRİ ÜÇÜN SİFARİŞ TARİXÇƏSİ
+    public List<OrderResponseDTO> getMyOrders() {
+        // 1. Hazırda giriş etmiş istifadəçini tapırıq (kiçik hərflə userService)
+        User user = userService.getCurrentUser();
+        
+        // 2. Həmin istifadəçiyə aid sifarişləri gətiririk
+        List<Order> orders = orderRepository.findByUserOrderByOrderDateDesc(user);
+        
+        return orders.stream()
+                .map(this::convertToResponseDTO)
+                .toList();
+    }
+
     private OrderResponseDTO convertToResponseDTO(Order order) {
         OrderResponseDTO dto = new OrderResponseDTO();
         dto.setId(order.getId());
@@ -126,12 +136,10 @@ public class OrderService {
         dto.setOrderDate(order.getOrderDate());
         dto.setPreferredDeliveryTime(order.getPreferredDeliveryTime());
 
-        // Kuryer məlumatlarını bura əlavə edirik:
         dto.setCourierName(order.getCourierName());
         dto.setCourierPhone(order.getCourierPhone());
         dto.setEstimatedDeliveryTime(order.getEstimatedDeliveryTime());
         
-        // Item-ləri DTO-ya çeviririk
         if (order.getOrderItems() != null) {
             List<OrderItemDTO> itemDtos = order.getOrderItems().stream().map(item -> {
                 OrderItemDTO idto = new OrderItemDTO();
@@ -139,7 +147,6 @@ public class OrderService {
                 idto.setPerfumeId(item.getPerfume() != null ? item.getPerfume().getId() : null);
                 idto.setPerfumeName(item.getPerfumeName());
                 
-                // BURA DIQQƏT: Brend və Şəkli 'Perfume' obyektindən götürürük
                 if (item.getPerfume() != null) {
                     idto.setBrand(item.getPerfume().getBrand());
                     idto.setImageUrl(item.getPerfume().getImageUrl());

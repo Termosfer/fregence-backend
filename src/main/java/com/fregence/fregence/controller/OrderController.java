@@ -33,6 +33,11 @@ public class OrderController {
 	     return ResponseEntity.ok("Sifariş kuryerə verildi və status yeniləndi.");
 	 }
 	 
+	 @GetMapping("/my")
+	 public ResponseEntity<List<OrderResponseDTO>> getMyOrders() {
+	     return ResponseEntity.ok(orderService.getMyOrders());
+	 }
+	 
 	 @PostMapping("/checkout")
 	 public ResponseEntity<String> checkout(
 	         @RequestParam String address, 

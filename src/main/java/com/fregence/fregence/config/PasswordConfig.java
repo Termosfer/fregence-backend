@@ -60,6 +60,7 @@ public class PasswordConfig {
 						.requestMatchers("/api/orders/**").hasAnyRole("USER", "ADMIN")
 						.requestMatchers("/api/orders/admin/**").hasRole("ADMIN")
 						.requestMatchers("/api/admin/dashboard/**").hasRole("ADMIN")
+						.requestMatchers("/api/orders/my").hasAnyRole("USER", "ADMIN")
 						.requestMatchers("/api/orders/checkout").hasAnyRole("USER", "ADMIN")
 						.requestMatchers("/api/wishlist/**").hasAnyRole("USER", "ADMIN").requestMatchers("/uploads/**")
 						.permitAll()
