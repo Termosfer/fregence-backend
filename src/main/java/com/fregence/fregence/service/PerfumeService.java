@@ -29,8 +29,10 @@ public class PerfumeService {
 	private final FileService fileService;
 
 	private final PerfumeRepository repository;
-	@Autowired private WishlistRepository wishlistRepository;
-	@Autowired private CartItemRepository cartItemRepository;
+	@Autowired 
+	private WishlistRepository wishlistRepository;
+	@Autowired 
+	private CartItemRepository cartItemRepository;
 	public PerfumeService(PerfumeRepository repository, FileService fileService, RedisConfig redisConfig) {
 		this.repository = repository;
 		this.fileService = fileService;
@@ -84,6 +86,7 @@ public class PerfumeService {
 	}
 
 	// 4. Ətiri redaktə etmək (DTO qaytarır)
+	@CacheEvict(value = "perfumes", allEntries = true) // Bu sətir mütləq olmalıdır!
 	@Transactional
 	public PerfumeDTO updatePerfume(Long id, Perfume updatedPerfume) {
 		Perfume existingPerfume = repository.findById(id).orElseThrow(() -> new RuntimeException("Perfume not found"));

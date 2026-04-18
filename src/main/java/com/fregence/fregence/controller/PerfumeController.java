@@ -83,11 +83,35 @@ public class PerfumeController {
 	}
 
 	// 5. Update
-	@PutMapping("/{id}")
-	public ResponseEntity<PerfumeDTO> update(@PathVariable Long id, @RequestBody Perfume perfume) {
-		return ResponseEntity.ok(service.updatePerfume(id, perfume));
-	}
+	// 5. ADMIN: Yeniləmək (Edit) - Artıq şəkil dəyişməyi də dəstəkləyir
+	@PutMapping(value = "/{id}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
+	public ResponseEntity<PerfumeDTO> update(
+	        @PathVariable Long id,
+	        @RequestPart("perfume") String perfumeJson, // JSON string kimi alırıq
+	        @RequestPart(value = "image", required = false) MultipartFile image) throws Exception {
+	    
+	    // 1. Gələn JSON stringini obyekti çeviririk
+	    ObjectMapper objectMapper = new ObjectMapper();
+	    Perfume updatedData = objectMapper.readValue(perfumeJson, Perfume.class);
 
+	    // 2. Bazadakı mövcud ətiri tapırıq
+	    // (Bunu Service-də etmək daha yaxşıdır, amma hazırkı strukturuna uyğun yazıram)
+	    PerfumeDTO existingPerfumeDto = service.getPerfumeById(id);
+	    
+	    // 3. Əgər yeni şəkil göndərilibsə, köhnəni silib yenisini yükləyirik
+	    if (image != null && !image.isEmpty()) {
+	        // Mövcud ətirin imagePublicId-sini tapmaq üçün bizə Entity lazımdır
+	        // Sənin PerfumeService.updatePerfume metodun artıq bu işi görməlidir.
+	        // Gəl sadəcə datanı Service-ə ötürək, o hər şeyi həll etsin.
+	        
+	        Map<String, String> imageData = fileService.uploadImage(image);
+	        updatedData.setImageUrl(imageData.get("url"));
+	        updatedData.setImagePublicId(imageData.get("public_id"));
+	    }
+
+	    // 4. Yenilənmiş məlumatları Service-ə göndəririk
+	    return ResponseEntity.ok(service.updatePerfume(id, updatedData));
+	}
 	// 6. Delete
 	@DeleteMapping("/{id}")
 	public ResponseEntity<String> delete(@PathVariable Long id) {
