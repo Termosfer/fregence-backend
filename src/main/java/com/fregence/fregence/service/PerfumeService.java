@@ -10,23 +10,31 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.fregence.fregence.entity.Perfume;
 import com.fregence.fregence.entity.Gender;
+import com.fregence.fregence.config.RedisConfig;
 import com.fregence.fregence.dto.PagedResponse;
 import com.fregence.fregence.dto.PerfumeDTO; // DTO importu mütləqdir
+import com.fregence.fregence.repository.CartItemRepository;
 import com.fregence.fregence.repository.PerfumeRepository;
+import com.fregence.fregence.repository.WishlistRepository;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 
 @Service
 public class PerfumeService {
 
+    private final RedisConfig redisConfig;
+
 	private final FileService fileService;
 
 	private final PerfumeRepository repository;
-
-	public PerfumeService(PerfumeRepository repository, FileService fileService) {
+	@Autowired private WishlistRepository wishlistRepository;
+	@Autowired private CartItemRepository cartItemRepository;
+	public PerfumeService(PerfumeRepository repository, FileService fileService, RedisConfig redisConfig) {
 		this.repository = repository;
 		this.fileService = fileService;
+		this.redisConfig = redisConfig;
 	}
 
 	// 1. Yeni ətir əlavə etmək (DTO qaytarır)
@@ -100,18 +108,20 @@ public class PerfumeService {
 	@CacheEvict(value = "perfumes", allEntries = true)
 	@Transactional
 	public void deletePerfume(Long id) {
-		Perfume perfume = repository.findById(id).orElseThrow(() -> new RuntimeException("Perfume not found"));
+	    Perfume perfume = repository.findById(id)
+	            .orElseThrow(() -> new RuntimeException("Perfume not found"));
 
-		// 1. Cloudinary-dən şəkli silirik
-		try {
-			fileService.deleteImage(perfume.getImagePublicId());
-		} catch (IOException e) {
-			// Şəkil silinməsə belə bazadan silməyə davam etsin (opsional)
-			System.out.println("Cloudinary-dən şəkil silinərkən xəta: " + e.getMessage());
-		}
+	    // Silməzdən əvvəl başqa cədvəllərdəki izləri silirik:
+	    wishlistRepository.deleteByPerfume(perfume);
+	    cartItemRepository.deleteByPerfume(perfume);
 
-		// 2. Bazadan (PostgreSQL) silirik
-		repository.delete(perfume);
+	    // Cloudinary-dən şəkli silirik:
+	    if (perfume.getImagePublicId() != null) {
+	        fileService.deleteImage(perfume.getImagePublicId());
+	    }
+
+	    // İndi artıq əsas cədvəldən silə bilərik:
+	    repository.delete(perfume);
 	}
 
 	
