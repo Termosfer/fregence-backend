@@ -10,9 +10,14 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class DashboardDTO {
-    private Long totalUsers;         // Cəmi müştəri sayı
-    private Long totalOrders;        // Cəmi sifariş sayı
-    private Long totalPerfumes;      // Bazadakı ətir çeşidi sayı
-    private Double totalRevenue;     // Ümumi qazanc (AZN)
-    private String topSellingPerfume; // Ən çox satılan ətir
+	private long totalUsers;
+    private long totalOrders;
+    private long totalPerfumes;
+    private double totalRevenue;
+    
+    // XƏTA VERƏN SAHƏLƏR (Bura əlavə olundu):
+    private double averageOrderValue;
+    private double customerGrowthRate;
+    
+    private String topSellingPerfume;
 }

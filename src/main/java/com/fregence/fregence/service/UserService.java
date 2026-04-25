@@ -1,10 +1,13 @@
 package com.fregence.fregence.service;
 
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.fregence.fregence.dto.ChangePasswordDTO;
+import com.fregence.fregence.dto.UserResponseDTO;
 import com.fregence.fregence.dto.UserUpdateDTO;
 import com.fregence.fregence.entity.Role;
 import com.fregence.fregence.entity.User;
@@ -51,6 +54,12 @@ public class UserService {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("İstifadəçi tapılmadı"));
+    }
+    
+    public List<UserResponseDTO> getAllUsers() {
+        return userRepository.findAll().stream()
+                .map(user -> new UserResponseDTO(user.getId(), user.getName(), user.getEmail(), user.getRole().name()))
+                .toList();
     }
 
     // 2. Profil məlumatlarını yeniləmək

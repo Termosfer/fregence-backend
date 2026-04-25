@@ -1,6 +1,9 @@
 package com.fregence.fregence.controller;
 
+import java.util.List;
+
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -47,5 +50,10 @@ public class UserController {
     public ResponseEntity<String> changePassword(@Valid @RequestBody ChangePasswordDTO passwordDTO) {
         userService.changePassword(passwordDTO, passwordEncoder);
         return ResponseEntity.ok("Şifrə uğurla dəyişdirildi.");
+    }
+    @GetMapping("/admin/all-users")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<UserResponseDTO>> getAllUsers() {
+        return ResponseEntity.ok(userService.getAllUsers());
     }
 }

@@ -39,4 +39,12 @@ public class User {
 	
 	@NotBlank(message = "Ad boş ola bilməz")
 	private String name;
+	
+	@Column(name = "created_at", updatable = false)
+	private java.time.LocalDateTime createdAt;
+
+	@jakarta.persistence.PrePersist
+	protected void onCreate() {
+	    this.createdAt = java.time.LocalDateTime.now();
+	}
 }

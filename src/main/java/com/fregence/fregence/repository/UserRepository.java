@@ -11,4 +11,6 @@ import com.fregence.fregence.entity.User;
 public interface  UserRepository extends JpaRepository<User, Long> {
 Optional<User>findByEmail(String email);
 boolean existsByEmail(String email);
+long countByCreatedAtAfter(java.time.LocalDateTime date);
+long countByCreatedAtBetween(java.time.LocalDateTime start, java.time.LocalDateTime end);
 }
