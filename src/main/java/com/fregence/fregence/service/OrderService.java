@@ -36,9 +36,11 @@ public class OrderService {
     private UserService userService; 
 
     @Transactional
-    public void placeOrder(String address, String phoneNumber, LocalDateTime preferredTime, String note) {
+    public OrderResponseDTO placeOrder(String address, String phoneNumber, LocalDateTime preferredTime, String note) {
         Cart cart = cartService.getOrCreateCart();
-        if (cart.getItems().isEmpty()) throw new RuntimeException("Səbət boşdur!");
+        if (cart.getItems().isEmpty()) {
+            throw new RuntimeException("Səbət boşdur!");
+        }
 
         if (preferredTime != null && preferredTime.isBefore(LocalDateTime.now())) {
             throw new RuntimeException("Çatdırılma vaxtı keçmiş tarix ola bilməz!");
@@ -73,13 +75,19 @@ public class OrderService {
             orderItems.add(orderItem);
             total += price * cartItem.getQuantity();
         }
-
+        
         order.setOrderItems(orderItems);
         order.setTotalAmount(total);
-        orderRepository.save(order);
+
+        // VACİB: Yadda saxlanılan obyekti 'savedOrder' dəyişəninə mənimsədirik
+        Order savedOrder = orderRepository.save(order);
         
+        // Səbəti təmizləyirik
         cart.getItems().clear();
         cartRepository.save(cart);
+        
+        // İndi 'savedOrder' obyektini DTO-ya çevirib qaytarırıq
+        return convertToResponseDTO(savedOrder);
     }
     
     public List<OrderResponseDTO> getAllOrdersForAdmin() {

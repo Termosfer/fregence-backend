@@ -39,14 +39,15 @@ public class OrderController {
 	 }
 	 
 	 @PostMapping("/checkout")
-	 public ResponseEntity<String> checkout(
+	 public ResponseEntity<OrderResponseDTO> checkout( // String yerinə OrderResponseDTO yazırıq
 	         @RequestParam String address, 
 	         @RequestParam String phoneNumber,
 	         @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) LocalDateTime preferredTime,
 	         @RequestParam(required = false) String note) {
 	         
-	     orderService.placeOrder(address, phoneNumber, preferredTime, note);
-	     return ResponseEntity.ok("Sifarişiniz uğurla qəbul edildi!");
+	     // Service-dən qayıdan DTO-nu birbaşa ResponseEntity ilə göndəririk
+	     OrderResponseDTO orderResponse = orderService.placeOrder(address, phoneNumber, preferredTime, note);
+	     return ResponseEntity.ok(orderResponse);
 	 }
 	 
 	// Admin üçün bütün sifarişlər
