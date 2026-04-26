@@ -17,13 +17,13 @@ import jakarta.transaction.Transactional;
 public interface WishlistRepository extends JpaRepository<Wishlist, Long> {
     List<Wishlist> findByUser(User user);
     long countByUser(User user);
-    // Eyni ətir siyahıda artıq varmı? (Təkrarın qarşısını almaq üçün)
     boolean existsByUserAndPerfume(User user, Perfume perfume);
-    
-    // Silmək üçün
     void deleteByUserAndPerfume(User user, Perfume perfume);
     
     @Modifying
     @Transactional
     void deleteByPerfume(Perfume perfume);
+
+    // YENİ: İstifadəçi silinəndə bütün wishlist-ini silmək üçün
+    void deleteByUser(User user);
 }

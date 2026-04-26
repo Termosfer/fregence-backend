@@ -16,6 +16,7 @@ import com.fregence.fregence.entity.Order;
 import com.fregence.fregence.entity.OrderItem;
 import com.fregence.fregence.entity.User;
 import com.fregence.fregence.repository.CartRepository;
+import com.fregence.fregence.repository.OrderItemRepository;
 import com.fregence.fregence.repository.OrderRepository;
 
 import jakarta.transaction.Transactional;
@@ -25,6 +26,9 @@ public class OrderService {
 
     @Autowired
     private OrderRepository orderRepository;
+    
+    @Autowired
+    private OrderItemRepository orderItemRepository;
     
     @Autowired
     private CartService cartService;
@@ -72,6 +76,9 @@ public class OrderService {
             orderItem.setPriceAtPurchase(price);
             orderItem.setQuantity(cartItem.getQuantity());
 
+            // YENİ: Satınalma anındakı şəkli qeyd edirik
+            orderItem.setImageUrlAtPurchase(cartItem.getPerfume().getImageUrl());
+
             orderItems.add(orderItem);
             total += price * cartItem.getQuantity();
         }
@@ -79,17 +86,12 @@ public class OrderService {
         order.setOrderItems(orderItems);
         order.setTotalAmount(total);
 
-        // VACİB: Yadda saxlanılan obyekti 'savedOrder' dəyişəninə mənimsədirik
         Order savedOrder = orderRepository.save(order);
-        
-        // Səbəti təmizləyirik
         cart.getItems().clear();
         cartRepository.save(cart);
         
-        // İndi 'savedOrder' obyektini DTO-ya çevirib qaytarırıq
         return convertToResponseDTO(savedOrder);
     }
-    
     public List<OrderResponseDTO> getAllOrdersForAdmin() {
         return orderRepository.findAll(Sort.by("orderDate").descending())
                 .stream()
@@ -97,6 +99,46 @@ public class OrderService {
                 .toList();
     }
 
+ // ---- Silmə ----
+    @Transactional
+    public void deleteOrder(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Sifariş tapılmadı"));
+        orderRepository.delete(order);
+    }
+
+    @Transactional
+    public void deleteAllOrders() {
+        orderRepository.deleteAll();
+    }
+
+    // ---- Filtirləmə ----
+    public List<OrderResponseDTO> filterOrders(
+            String customerName,
+            Double minPrice,
+            Double maxPrice,
+            LocalDateTime startDate,
+            LocalDateTime endDate,
+            String sortBy,
+            String sortDir) {
+
+        Sort sort = sortDir != null && sortDir.equalsIgnoreCase("asc")
+                ? Sort.by(sortBy != null ? sortBy : "orderDate").ascending()
+                : Sort.by(sortBy != null ? sortBy : "orderDate").descending();
+
+        List<Order> orders = orderRepository.findAll(sort);
+
+        return orders.stream()
+                .filter(o -> customerName == null || (o.getUser() != null && o.getUser().getName().toLowerCase().contains(customerName.toLowerCase())))
+                .filter(o -> minPrice == null || o.getTotalAmount() >= minPrice)
+                .filter(o -> maxPrice == null || o.getTotalAmount() <= maxPrice)
+                .filter(o -> startDate == null || !o.getOrderDate().isBefore(startDate))
+                .filter(o -> endDate == null || !o.getOrderDate().isAfter(endDate))
+                .map(this::convertToResponseDTO)
+                .toList();
+    }
+    
+    
     @Transactional
     public void updateOrderStatus(Long orderId, String newStatus) {
         Order order = orderRepository.findById(orderId)
@@ -134,8 +176,14 @@ public class OrderService {
     private OrderResponseDTO convertToResponseDTO(Order order) {
         OrderResponseDTO dto = new OrderResponseDTO();
         dto.setId(order.getId());
-        dto.setCustomerName(order.getUser().getName());
-        dto.setCustomerEmail(order.getUser().getEmail());
+        if (order.getUser() != null) {
+            dto.setCustomerName(order.getUser().getName());
+            dto.setCustomerEmail(order.getUser().getEmail());
+        } else {
+            // İstifadəçi silinibsə bu məlumatlar görünsün
+            dto.setCustomerName("Silinmiş Hesab");
+            dto.setCustomerEmail("Məlumat yoxdur");
+        }
         dto.setTotalAmount(order.getTotalAmount());
         dto.setAddress(order.getAddress());
         dto.setPhoneNumber(order.getPhoneNumber());
@@ -153,12 +201,16 @@ public class OrderService {
                 OrderItemDTO idto = new OrderItemDTO();
                 idto.setId(item.getId());
                 idto.setPerfumeId(item.getPerfume() != null ? item.getPerfume().getId() : null);
-                idto.setPerfumeName(item.getPerfumeName());
+                idto.setPerfumeName(item.getPerfumeName()); // Artıq snapshot-dan gəlir
                 
+                // Brand məlumatı hələ də parfümdən gələ bilər, 
+                // amma tam təhlükəsizlik üçün onu da snapshot edə bilərsiniz.
                 if (item.getPerfume() != null) {
                     idto.setBrand(item.getPerfume().getBrand());
-                    idto.setImageUrl(item.getPerfume().getImageUrl());
                 }
+
+                // YENİ: Parfümün indiki şəkli deyil, sifariş anındakı şəkli
+                idto.setImageUrl(item.getImageUrlAtPurchase()); 
 
                 idto.setPrice(item.getPriceAtPurchase());
                 idto.setQuantity(item.getQuantity());

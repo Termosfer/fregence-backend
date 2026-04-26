@@ -1,5 +1,4 @@
 package com.fregence.fregence.entity;
-
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -16,10 +15,13 @@ public class OrderItem {
     private Order order;
 
     @ManyToOne
-    @JoinColumn(name = "perfume_id")
+    @JoinColumn(name = "perfume_id", nullable = true)
     private Perfume perfume;
 
-    private String perfumeName; // Ətrin adı (Snapshot)
-    private Double priceAtPurchase; // Qiymət (Snapshot)
+    private String perfumeName;
+    private Double priceAtPurchase;
     private Integer quantity;
+    
+    // YENİ: Sifariş anındakı şəkil snapshot-u
+    private String imageUrlAtPurchase;
 }

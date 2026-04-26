@@ -11,8 +11,11 @@ import com.fregence.fregence.entity.User;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
-    List<Order> findByUserOrderByOrderDateDesc(User user); // İstifadəçinin öz sifarişləri
- // Bütün tamamlanmış sifarişlərin cəmini hesablayır
+    List<Order> findByUserOrderByOrderDateDesc(User user);
+    
+    // YENİ: İstifadəçini silməzdən əvvəl sifarişlərini tapmaq üçün
+    List<Order> findByUser(User user); 
+
     @Query("SELECT SUM(o.totalAmount) FROM Order o WHERE o.status = 'DELIVERED'")
     Double getTotalDeliveredRevenue();
 }

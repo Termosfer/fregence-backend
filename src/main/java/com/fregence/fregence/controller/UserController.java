@@ -56,4 +56,11 @@ public class UserController {
     public ResponseEntity<List<UserResponseDTO>> getAllUsers() {
         return ResponseEntity.ok(userService.getAllUsers());
     }
+    // 4. İstifadəçini silmək (Yalnız Admin üçün)
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<String> deleteUser(@PathVariable Long id) {
+        userService.deleteUser(id);
+        return ResponseEntity.ok("İstifadəçi və ona aid aktiv datalar silindi, sifariş tarixçəsi qorundu.");
+    }
 }

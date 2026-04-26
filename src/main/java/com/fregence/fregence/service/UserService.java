@@ -9,9 +9,13 @@ import org.springframework.stereotype.Service;
 import com.fregence.fregence.dto.ChangePasswordDTO;
 import com.fregence.fregence.dto.UserResponseDTO;
 import com.fregence.fregence.dto.UserUpdateDTO;
+import com.fregence.fregence.entity.Order;
 import com.fregence.fregence.entity.Role;
 import com.fregence.fregence.entity.User;
+import com.fregence.fregence.repository.CartRepository;
+import com.fregence.fregence.repository.OrderRepository;
 import com.fregence.fregence.repository.UserRepository;
+import com.fregence.fregence.repository.WishlistRepository;
 
 import jakarta.transaction.Transactional;
 
@@ -20,36 +24,42 @@ import org.springframework.security.core.context.SecurityContextHolder;
 @Service
 public class UserService {
 	
-	@Autowired
-	private UserRepository userRepository;
+    @Autowired
+    private UserRepository userRepository;
 	
     @Autowired
-	private PasswordEncoder passwordEncoder;
+    private PasswordEncoder passwordEncoder;
+
+    // YENİ: Digər dataları təmizləmək üçün repository-lər
+    @Autowired
+    private OrderRepository orderRepository;
+
+    @Autowired
+    private CartRepository cartRepository;
+
+    @Autowired
+    private WishlistRepository wishlistRepository;
     
     public User register(User user) {
     	if (userRepository.existsByEmail(user.getEmail())) {
             throw new RuntimeException("Email already exists!");
         }
 
-    	// 🔥 DEFAULT ROLE VER
         user.setRole(Role.USER);
 
-        // Hash edib DB-yə göndər
         String rawPassword = user.getPassword();
         user.setPassword(passwordEncoder.encode(rawPassword));
         User savedUser = userRepository.save(user);
 
-        // Cavab üçün plain passwordu geri qoy (optional, təhlükəsizliyə görə tövsiyə edilmir)
         savedUser.setPassword(rawPassword);
-
         return savedUser;
     }
+
     public User findByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
     
- // 1. Hazırda login olan istifadəçini tapmaq
     public User getCurrentUser() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findByEmail(email)
@@ -62,12 +72,10 @@ public class UserService {
                 .toList();
     }
 
-    // 2. Profil məlumatlarını yeniləmək
     @Transactional
     public User updateProfile(UserUpdateDTO updateDTO) {
         User user = getCurrentUser();
         
-        // Email dəyişirsə, yeni emailin bazada olub-olmadığını yoxlayaq
         if (!user.getEmail().equals(updateDTO.getEmail()) && 
             userRepository.findByEmail(updateDTO.getEmail()).isPresent()) {
             throw new RuntimeException("Bu email artıq başqa istifadəçi tərəfindən istifadə olunur!");
@@ -78,20 +86,46 @@ public class UserService {
         return userRepository.save(user);
     }
 
-    // 3. Şifrəni dəyişmək
     @Transactional
     public void changePassword(ChangePasswordDTO passwordDTO, PasswordEncoder passwordEncoder) {
         User user = getCurrentUser();
 
-        // Köhnə şifrənin doğruluğunu yoxlayırıq
         if (!passwordEncoder.matches(passwordDTO.getOldPassword(), user.getPassword())) {
             throw new RuntimeException("Köhnə şifrəniz yanlışdır!");
         }
 
-        // Yeni şifrəni hash-ləyib yadda saxlayırıq
         user.setPassword(passwordEncoder.encode(passwordDTO.getNewPassword()));
         userRepository.save(user);
     }
-    
-    
+
+    // YENİ: İsti̇fadəçi̇ni̇ si̇lmə metodu
+ // YENİ: İsti̇fadəçi̇ni̇ si̇lmə metodu (Qorunmuş versiya)
+    @Transactional
+    public void deleteUser(Long id) {
+        // 1. Hazırda daxil olan istifadəçini tapırıq
+        User currentUser = getCurrentUser();
+
+        // 2. QORUMA: Əgər silinmək istənən ID hazırkı adminin ID-sidirsə, imtina et
+        if (currentUser.getId().equals(id)) {
+            throw new RuntimeException("Öz hesabınızı silə bilməzsiniz! Bu sistemin kilidlənməsinə səbəb ola bilər.");
+        }
+
+        // 3. Silinəcək istifadəçini tapırıq
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("İstifadəçi tapılmadı"));
+
+        // 4. Sifariş tarixçəsini qoru (User referansını null et)
+        List<Order> orders = orderRepository.findByUser(user);
+        if (!orders.isEmpty()) {
+            orders.forEach(order -> order.setUser(null));
+            orderRepository.saveAll(orders);
+        }
+
+        // 5. Aktiv səbəti və wishlist-i sil
+        cartRepository.deleteByUser(user);
+        wishlistRepository.deleteByUser(user);
+
+        // 6. İstifadəçini sil
+        userRepository.delete(user);
+    }
 }
