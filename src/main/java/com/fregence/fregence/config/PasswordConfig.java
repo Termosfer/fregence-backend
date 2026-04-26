@@ -68,6 +68,7 @@ public class PasswordConfig {
 						// Auth endpoints açıqdır (Login/Register)
 						.requestMatchers("/api/auth/**").permitAll().requestMatchers("/error").permitAll()
 						.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+						.requestMatchers("/api/payment/**").hasAnyRole("USER", "ADMIN")
 						
 						// BU SƏTRI ƏLAVƏ ET (Options sorğuları üçün):
 			            .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
