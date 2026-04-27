@@ -47,7 +47,7 @@ public class PerfumeService {
 
 	// 1. Yeni ətir əlavə etmək (DTO qaytarır)
 	// 2. Yeni ətir əlavə olunanda köhnə keş (siyahı) artıq yalandır, onu sil!
-	@CacheEvict(value = "perfumes", allEntries = true)
+	@CacheEvict(value = {"perfumes", "perfume-details", "perfume-related"}, allEntries = true)
 	@Transactional
 	public PerfumeDTO savePerfume(Perfume perfume) {
 		Perfume savedPerfume = repository.save(perfume);
@@ -86,7 +86,7 @@ public class PerfumeService {
 	}
 
 	// 4. Ətiri redaktə etmək (DTO qaytarır)
-	@CacheEvict(value = "perfumes", allEntries = true) // Bu sətir mütləq olmalıdır!
+	@CacheEvict(value = {"perfumes", "perfume-details", "perfume-related"}, allEntries = true)
 	@Transactional
 	public PerfumeDTO updatePerfume(Long id, Perfume updatedPerfume) {
 		Perfume existingPerfume = repository.findById(id).orElseThrow(() -> new RuntimeException("Perfume not found"));
@@ -110,7 +110,7 @@ public class PerfumeService {
 
 	// 5. Ətiri silmək
 	// 3. Ətir silinəndə də keşi təmizlə
-	@CacheEvict(value = "perfumes", allEntries = true)
+	@CacheEvict(value = {"perfumes", "perfume-details", "perfume-related"}, allEntries = true)
 	@Transactional
 	public void deletePerfume(Long id) {
 		// 1. Məhsulun mövcudluğunu yoxla
@@ -154,12 +154,12 @@ public class PerfumeService {
 		return new PagedResponse<>(dtoPage.getContent(), dtoPage.getNumber(), dtoPage.getSize(),
 				dtoPage.getTotalElements(), dtoPage.getTotalPages(), dtoPage.isLast());
 	}
-
+	@Cacheable(value = "perfumes", key = "'recommendations'")
 	public java.util.List<PerfumeDTO> getRecommendedPerfumes() {
 		return repository.findByIsRecommendedTrue().stream().map(this::convertToDto)
 				.collect(java.util.stream.Collectors.toList());
 	}
-
+	@Cacheable(value = "perfume-related", key = "#id")
 	public java.util.List<PerfumeDTO> getRelatedPerfumes(Long id) {
 		// Əvvəlcə baxılan ətiri tapırıq ki, brendini bilək
 		Perfume perfume = repository.findById(id).orElseThrow(() -> new RuntimeException("Perfume not found"));
