@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import com.fregence.fregence.dto.OrderItemDTO;
@@ -24,204 +25,207 @@ import jakarta.transaction.Transactional;
 @Service
 public class OrderService {
 
-    @Autowired
-    private OrderRepository orderRepository;
-    
-    @Autowired
-    private OrderItemRepository orderItemRepository;
-    
-    @Autowired
-    private CartService cartService;
-    
-    @Autowired
-    private CartRepository cartRepository;
+	@Autowired
+	private OrderRepository orderRepository;
 
-    @Autowired
-    private UserService userService; 
+	@Autowired
+	private OrderItemRepository orderItemRepository;
 
-    @Transactional
-    public OrderResponseDTO placeOrder(String address, String phoneNumber, LocalDateTime preferredTime, String note) {
-        Cart cart = cartService.getOrCreateCart();
-        if (cart.getItems().isEmpty()) {
-            throw new RuntimeException("Səbət boşdur!");
-        }
+	@Autowired
+	private TelegramNotificationService telegramService;
 
-        if (preferredTime != null && preferredTime.isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("Çatdırılma vaxtı keçmiş tarix ola bilməz!");
-        }
+	@Autowired
+	private SimpMessagingTemplate messagingTemplate;
 
-        Order order = new Order();
-        order.setUser(cart.getUser());
-        order.setAddress(address);
-        order.setPhoneNumber(phoneNumber);
-        order.setPreferredDeliveryTime(preferredTime); 
-        order.setOrderNote(note);
-        order.setOrderDate(LocalDateTime.now());
-        order.setStatus("PENDING");
+	@Autowired
+	private CartService cartService;
 
-        List<OrderItem> orderItems = new ArrayList<>();
-        double total = 0;
+	@Autowired
+	private CartRepository cartRepository;
 
-        for (CartItem cartItem : cart.getItems()) {
-            OrderItem orderItem = new OrderItem();
-            orderItem.setOrder(order);
-            orderItem.setPerfume(cartItem.getPerfume());
-            
-            String fullName = cartItem.getPerfume().getBrand() + " " + cartItem.getPerfume().getName();
-            orderItem.setPerfumeName(fullName);
-            
-            Double price = (cartItem.getPerfume().getDiscountPrice() != null) ? 
-                            cartItem.getPerfume().getDiscountPrice() : cartItem.getPerfume().getPrice();
-            
-            orderItem.setPriceAtPurchase(price);
-            orderItem.setQuantity(cartItem.getQuantity());
+	@Autowired
+	private UserService userService;
 
-            // YENİ: Satınalma anındakı şəkli qeyd edirik
-            orderItem.setImageUrlAtPurchase(cartItem.getPerfume().getImageUrl());
+	@Transactional
+	public OrderResponseDTO placeOrder(String address, String phoneNumber, LocalDateTime preferredTime, String note) {
+		Cart cart = cartService.getOrCreateCart();
+		if (cart.getItems().isEmpty()) {
+			throw new RuntimeException("Səbət boşdur!");
+		}
 
-            orderItems.add(orderItem);
-            total += price * cartItem.getQuantity();
-        }
-        
-        order.setOrderItems(orderItems);
-        order.setTotalAmount(total);
+		if (preferredTime != null && preferredTime.isBefore(LocalDateTime.now())) {
+			throw new RuntimeException("Çatdırılma vaxtı keçmiş tarix ola bilməz!");
+		}
 
-        Order savedOrder = orderRepository.save(order);
-        cart.getItems().clear();
-        cartRepository.save(cart);
-        
-        return convertToResponseDTO(savedOrder);
-    }
-    public List<OrderResponseDTO> getAllOrdersForAdmin() {
-        return orderRepository.findAll(Sort.by("orderDate").descending())
-                .stream()
-                .map(this::convertToResponseDTO)
-                .toList();
-    }
+		Order order = new Order();
+		order.setUser(cart.getUser());
+		order.setAddress(address);
+		order.setPhoneNumber(phoneNumber);
+		order.setPreferredDeliveryTime(preferredTime);
+		order.setOrderNote(note);
+		order.setOrderDate(LocalDateTime.now());
+		order.setStatus("PENDING");
 
- // ---- Silmə ----
-    @Transactional
-    public void deleteOrder(Long orderId) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Sifariş tapılmadı"));
-        orderRepository.delete(order);
-    }
+		List<OrderItem> orderItems = new ArrayList<>();
+		double total = 0;
 
-    @Transactional
-    public void deleteAllOrders() {
-        orderRepository.deleteAll();
-    }
+		for (CartItem cartItem : cart.getItems()) {
+			OrderItem orderItem = new OrderItem();
+			orderItem.setOrder(order);
+			orderItem.setPerfume(cartItem.getPerfume());
 
-    // ---- Filtirləmə ----
-    public List<OrderResponseDTO> filterOrders(
-            String customerName,
-            Double minPrice,
-            Double maxPrice,
-            LocalDateTime startDate,
-            LocalDateTime endDate,
-            String sortBy,
-            String sortDir) {
+			String fullName = cartItem.getPerfume().getBrand() + " " + cartItem.getPerfume().getName();
+			orderItem.setPerfumeName(fullName);
 
-        Sort sort = sortDir != null && sortDir.equalsIgnoreCase("asc")
-                ? Sort.by(sortBy != null ? sortBy : "orderDate").ascending()
-                : Sort.by(sortBy != null ? sortBy : "orderDate").descending();
+			Double price = (cartItem.getPerfume().getDiscountPrice() != null) ? cartItem.getPerfume().getDiscountPrice()
+					: cartItem.getPerfume().getPrice();
 
-        List<Order> orders = orderRepository.findAll(sort);
+			orderItem.setPriceAtPurchase(price);
+			orderItem.setQuantity(cartItem.getQuantity());
 
-        return orders.stream()
-                .filter(o -> customerName == null || (o.getUser() != null && o.getUser().getName().toLowerCase().contains(customerName.toLowerCase())))
-                .filter(o -> minPrice == null || o.getTotalAmount() >= minPrice)
-                .filter(o -> maxPrice == null || o.getTotalAmount() <= maxPrice)
-                .filter(o -> startDate == null || !o.getOrderDate().isBefore(startDate))
-                .filter(o -> endDate == null || !o.getOrderDate().isAfter(endDate))
-                .map(this::convertToResponseDTO)
-                .toList();
-    }
-    
-    
-    @Transactional
-    public void updateOrderStatus(Long orderId, String newStatus) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Sifariş tapılmadı"));
-        order.setStatus(newStatus);
-        orderRepository.save(order);
-    }
+			// YENİ: Satınalma anındakı şəkli qeyd edirik
+			orderItem.setImageUrlAtPurchase(cartItem.getPerfume().getImageUrl());
 
-    @Transactional
-    public void shipOrder(Long orderId, String courierName, String courierPhone, LocalDateTime estimatedTime) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Sifariş tapılmadı"));
+			orderItems.add(orderItem);
+			total += price * cartItem.getQuantity();
+		}
 
-        order.setStatus("SHIPPED"); 
-        order.setCourierName(courierName);
-        order.setCourierPhone(courierPhone);
-        order.setEstimatedDeliveryTime(estimatedTime);
+		order.setOrderItems(orderItems);
+		order.setTotalAmount(total);
 
-        orderRepository.save(order);
-    }
-    
-    // MÜŞTƏRİ ÜÇÜN SİFARİŞ TARİXÇƏSİ
-    public List<OrderResponseDTO> getMyOrders() {
-        // 1. Hazırda giriş etmiş istifadəçini tapırıq (kiçik hərflə userService)
-        User user = userService.getCurrentUser();
-        
-        // 2. Həmin istifadəçiyə aid sifarişləri gətiririk
-        List<Order> orders = orderRepository.findByUserOrderByOrderDateDesc(user);
-        
-        return orders.stream()
-                .map(this::convertToResponseDTO)
-                .toList();
-    }
+		Order savedOrder = orderRepository.save(order);
 
-    private OrderResponseDTO convertToResponseDTO(Order order) {
-        OrderResponseDTO dto = new OrderResponseDTO();
-        dto.setId(order.getId());
-        if (order.getUser() != null) {
-            dto.setCustomerName(order.getUser().getName());
-            dto.setCustomerEmail(order.getUser().getEmail());
-        } else {
-            // İstifadəçi silinibsə bu məlumatlar görünsün
-            dto.setCustomerName("Silinmiş Hesab");
-            dto.setCustomerEmail("Məlumat yoxdur");
-        }
-        dto.setTotalAmount(order.getTotalAmount());
-        dto.setAddress(order.getAddress());
-        dto.setPhoneNumber(order.getPhoneNumber());
-        dto.setOrderNote(order.getOrderNote());
-        dto.setStatus(order.getStatus());
-        dto.setOrderDate(order.getOrderDate());
-        dto.setPreferredDeliveryTime(order.getPreferredDeliveryTime());
+		// VACİB: Telegram bildirişini buraya əlavə edin
+		try {
+			telegramService.sendOrderNotification(savedOrder);
+			messagingTemplate.convertAndSend("/topic/admin-notifications",
+					"Yeni sifariş alındı! #" + savedOrder.getId());
+		} catch (Exception e) {
+			// Sifariş verilməsinə mane olmasın deyə log edirik
+			System.err.println("Bildiriş göndərilə bilmədi: " + e.getMessage());
+		}
 
-        dto.setCourierName(order.getCourierName());
-        dto.setCourierPhone(order.getCourierPhone());
-        dto.setEstimatedDeliveryTime(order.getEstimatedDeliveryTime());
-        
-        if (order.getOrderItems() != null) {
-            List<OrderItemDTO> itemDtos = order.getOrderItems().stream().map(item -> {
-                OrderItemDTO idto = new OrderItemDTO();
-                idto.setId(item.getId());
-                idto.setPerfumeId(item.getPerfume() != null ? item.getPerfume().getId() : null);
-                idto.setPerfumeName(item.getPerfumeName()); // Artıq snapshot-dan gəlir
-                
-                // Brand məlumatı hələ də parfümdən gələ bilər, 
-                // amma tam təhlükəsizlik üçün onu da snapshot edə bilərsiniz.
-                if (item.getPerfume() != null) {
-                    idto.setBrand(item.getPerfume().getBrand());
-                }
+		cart.getItems().clear();
+		cartRepository.save(cart);
 
-                // YENİ: Parfümün indiki şəkli deyil, sifariş anındakı şəkli
-                idto.setImageUrl(item.getImageUrlAtPurchase()); 
+		return convertToResponseDTO(savedOrder);
+	}
 
-                idto.setPrice(item.getPriceAtPurchase());
-                idto.setQuantity(item.getQuantity());
-                idto.setSubTotal(item.getPriceAtPurchase() * item.getQuantity());
-                return idto;
-            }).toList();
-            dto.setItems(itemDtos);
-        } else {
-            dto.setItems(new ArrayList<>());
-        }
-        
-        return dto;
-    }
+	public List<OrderResponseDTO> getAllOrdersForAdmin() {
+		return orderRepository.findAll(Sort.by("orderDate").descending()).stream().map(this::convertToResponseDTO)
+				.toList();
+	}
+
+	// ---- Silmə ----
+	@Transactional
+	public void deleteOrder(Long orderId) {
+		Order order = orderRepository.findById(orderId).orElseThrow(() -> new RuntimeException("Sifariş tapılmadı"));
+		orderRepository.delete(order);
+	}
+
+	@Transactional
+	public void deleteAllOrders() {
+		orderRepository.deleteAll();
+	}
+
+	// ---- Filtirləmə ----
+	public List<OrderResponseDTO> filterOrders(String customerName, Double minPrice, Double maxPrice,
+			LocalDateTime startDate, LocalDateTime endDate, String sortBy, String sortDir) {
+
+		Sort sort = sortDir != null && sortDir.equalsIgnoreCase("asc")
+				? Sort.by(sortBy != null ? sortBy : "orderDate").ascending()
+				: Sort.by(sortBy != null ? sortBy : "orderDate").descending();
+
+		List<Order> orders = orderRepository.findAll(sort);
+
+		return orders.stream().filter(o -> customerName == null
+				|| (o.getUser() != null && o.getUser().getName().toLowerCase().contains(customerName.toLowerCase())))
+				.filter(o -> minPrice == null || o.getTotalAmount() >= minPrice)
+				.filter(o -> maxPrice == null || o.getTotalAmount() <= maxPrice)
+				.filter(o -> startDate == null || !o.getOrderDate().isBefore(startDate))
+				.filter(o -> endDate == null || !o.getOrderDate().isAfter(endDate)).map(this::convertToResponseDTO)
+				.toList();
+	}
+
+	@Transactional
+	public void updateOrderStatus(Long orderId, String newStatus) {
+		Order order = orderRepository.findById(orderId).orElseThrow(() -> new RuntimeException("Sifariş tapılmadı"));
+		order.setStatus(newStatus);
+		orderRepository.save(order);
+	}
+
+	@Transactional
+	public void shipOrder(Long orderId, String courierName, String courierPhone, LocalDateTime estimatedTime) {
+		Order order = orderRepository.findById(orderId).orElseThrow(() -> new RuntimeException("Sifariş tapılmadı"));
+
+		order.setStatus("SHIPPED");
+		order.setCourierName(courierName);
+		order.setCourierPhone(courierPhone);
+		order.setEstimatedDeliveryTime(estimatedTime);
+
+		orderRepository.save(order);
+	}
+
+	// MÜŞTƏRİ ÜÇÜN SİFARİŞ TARİXÇƏSİ
+	public List<OrderResponseDTO> getMyOrders() {
+		// 1. Hazırda giriş etmiş istifadəçini tapırıq (kiçik hərflə userService)
+		User user = userService.getCurrentUser();
+
+		// 2. Həmin istifadəçiyə aid sifarişləri gətiririk
+		List<Order> orders = orderRepository.findByUserOrderByOrderDateDesc(user);
+
+		return orders.stream().map(this::convertToResponseDTO).toList();
+	}
+
+	private OrderResponseDTO convertToResponseDTO(Order order) {
+		OrderResponseDTO dto = new OrderResponseDTO();
+		dto.setId(order.getId());
+		if (order.getUser() != null) {
+			dto.setCustomerName(order.getUser().getName());
+			dto.setCustomerEmail(order.getUser().getEmail());
+		} else {
+			// İstifadəçi silinibsə bu məlumatlar görünsün
+			dto.setCustomerName("Silinmiş Hesab");
+			dto.setCustomerEmail("Məlumat yoxdur");
+		}
+		dto.setTotalAmount(order.getTotalAmount());
+		dto.setAddress(order.getAddress());
+		dto.setPhoneNumber(order.getPhoneNumber());
+		dto.setOrderNote(order.getOrderNote());
+		dto.setStatus(order.getStatus());
+		dto.setOrderDate(order.getOrderDate());
+		dto.setPreferredDeliveryTime(order.getPreferredDeliveryTime());
+
+		dto.setCourierName(order.getCourierName());
+		dto.setCourierPhone(order.getCourierPhone());
+		dto.setEstimatedDeliveryTime(order.getEstimatedDeliveryTime());
+
+		if (order.getOrderItems() != null) {
+			List<OrderItemDTO> itemDtos = order.getOrderItems().stream().map(item -> {
+				OrderItemDTO idto = new OrderItemDTO();
+				idto.setId(item.getId());
+				idto.setPerfumeId(item.getPerfume() != null ? item.getPerfume().getId() : null);
+				idto.setPerfumeName(item.getPerfumeName()); // Artıq snapshot-dan gəlir
+
+				// Brand məlumatı hələ də parfümdən gələ bilər,
+				// amma tam təhlükəsizlik üçün onu da snapshot edə bilərsiniz.
+				if (item.getPerfume() != null) {
+					idto.setBrand(item.getPerfume().getBrand());
+				}
+
+				// YENİ: Parfümün indiki şəkli deyil, sifariş anındakı şəkli
+				idto.setImageUrl(item.getImageUrlAtPurchase());
+
+				idto.setPrice(item.getPriceAtPurchase());
+				idto.setQuantity(item.getQuantity());
+				idto.setSubTotal(item.getPriceAtPurchase() * item.getQuantity());
+				return idto;
+			}).toList();
+			dto.setItems(itemDtos);
+		} else {
+			dto.setItems(new ArrayList<>());
+		}
+
+		return dto;
+	}
 }

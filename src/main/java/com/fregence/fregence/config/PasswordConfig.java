@@ -66,6 +66,7 @@ public class PasswordConfig {
 						.requestMatchers("/api/wishlist/**").hasAnyRole("USER", "ADMIN").requestMatchers("/uploads/**")
 						.permitAll()
 						// Auth endpoints açıqdır (Login/Register)
+						.requestMatchers("/ws-notifications/**").permitAll() 
 						.requestMatchers("/api/auth/**").permitAll().requestMatchers("/error").permitAll()
 						.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 						.requestMatchers("/api/payment/**").hasAnyRole("USER", "ADMIN")
