@@ -63,6 +63,7 @@ public class PasswordConfig {
 						.requestMatchers("/api/admin/dashboard/**").hasRole("ADMIN")
 						.requestMatchers("/api/orders/my").hasAnyRole("USER", "ADMIN")
 						.requestMatchers("/api/orders/checkout").hasAnyRole("USER", "ADMIN")
+						.requestMatchers("/api/users/admin/**").hasRole("ADMIN")
 						.requestMatchers("/api/wishlist/**").hasAnyRole("USER", "ADMIN").requestMatchers("/uploads/**")
 						.permitAll()
 						// Auth endpoints açıqdır (Login/Register)
