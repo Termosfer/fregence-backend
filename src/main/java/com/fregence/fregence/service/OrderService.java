@@ -77,8 +77,10 @@ public class OrderService {
 			String fullName = cartItem.getPerfume().getBrand() + " " + cartItem.getPerfume().getName();
 			orderItem.setPerfumeName(fullName);
 
-			Double price = (cartItem.getPerfume().getDiscountPrice() != null) ? cartItem.getPerfume().getDiscountPrice()
-					: cartItem.getPerfume().getPrice();
+			// Endirimi yalnız null deyilsə VƏ 0-dan böyükdürsə götür:
+			Double price = (cartItem.getPerfume().getDiscountPrice() != null
+					&& cartItem.getPerfume().getDiscountPrice() > 0) ? cartItem.getPerfume().getDiscountPrice()
+							: cartItem.getPerfume().getPrice();
 
 			orderItem.setPriceAtPurchase(price);
 			orderItem.setQuantity(cartItem.getQuantity());
@@ -180,46 +182,28 @@ public class OrderService {
 	private OrderResponseDTO convertToResponseDTO(Order order) {
 		OrderResponseDTO dto = new OrderResponseDTO();
 		dto.setId(order.getId());
-		if (order.getUser() != null) {
-			dto.setCustomerName(order.getUser().getName());
-			dto.setCustomerEmail(order.getUser().getEmail());
-		} else {
-			// İstifadəçi silinibsə bu məlumatlar görünsün
-			dto.setCustomerName("Silinmiş Hesab");
-			dto.setCustomerEmail("Məlumat yoxdur");
-		}
-		dto.setTotalAmount(order.getTotalAmount());
-		dto.setAddress(order.getAddress());
-		dto.setPhoneNumber(order.getPhoneNumber());
-		dto.setOrderNote(order.getOrderNote());
-		dto.setStatus(order.getStatus());
-		dto.setOrderDate(order.getOrderDate());
-		dto.setPreferredDeliveryTime(order.getPreferredDeliveryTime());
+		if (order.getOrderItems() != null && !order.getOrderItems().isEmpty()) {
+	        List<OrderItemDTO> itemDtos = order.getOrderItems().stream().map(item -> {
+	            OrderItemDTO idto = new OrderItemDTO();
+	            idto.setId(item.getId());
+	            idto.setPerfumeId(item.getPerfume() != null ? item.getPerfume().getId() : null);
+	            idto.setPerfumeName(item.getPerfumeName());
+	            
+	            // Brend və Şəkil məlumatlarını götürürük
+	            if (item.getPerfume() != null) {
+	                idto.setBrand(item.getPerfume().getBrand());
+	                idto.setImageUrl(item.getPerfume().getImageUrl());
+	            }
 
-		dto.setCourierName(order.getCourierName());
-		dto.setCourierPhone(order.getCourierPhone());
-		dto.setEstimatedDeliveryTime(order.getEstimatedDeliveryTime());
-
-		if (order.getOrderItems() != null) {
-			List<OrderItemDTO> itemDtos = order.getOrderItems().stream().map(item -> {
-				OrderItemDTO idto = new OrderItemDTO();
-				idto.setId(item.getId());
-				idto.setPerfumeId(item.getPerfume() != null ? item.getPerfume().getId() : null);
-				idto.setPerfumeName(item.getPerfumeName()); // Artıq snapshot-dan gəlir
-
-				// Brand məlumatı hələ də parfümdən gələ bilər,
-				// amma tam təhlükəsizlik üçün onu da snapshot edə bilərsiniz.
-				if (item.getPerfume() != null) {
-					idto.setBrand(item.getPerfume().getBrand());
-				}
-
-				// YENİ: Parfümün indiki şəkli deyil, sifariş anındakı şəkli
-				idto.setImageUrl(item.getImageUrlAtPurchase());
-
-				idto.setPrice(item.getPriceAtPurchase());
-				idto.setQuantity(item.getQuantity());
-				idto.setSubTotal(item.getPriceAtPurchase() * item.getQuantity());
-				return idto;
+	            // Qiyməti bazada donmuş (snapshot) dəyərdən götürürük
+	            double price = item.getPriceAtPurchase() != null ? item.getPriceAtPurchase() : 0.0;
+	            idto.setPrice(price);
+	            idto.setQuantity(item.getQuantity());
+	            
+	            // Subtotal-ı burada yenidən hesablayırıq ki, 0 görsənməsin
+	            idto.setSubTotal(price * item.getQuantity());
+	            
+	            return idto;
 			}).toList();
 			dto.setItems(itemDtos);
 		} else {
