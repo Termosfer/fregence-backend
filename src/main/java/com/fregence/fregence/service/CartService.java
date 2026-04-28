@@ -67,23 +67,36 @@ public class CartService {
 
 	// 3. Səbəti göstərmək üçün DTO-ya çevir
 	public CartDTO getMyCart() {
-		Cart cart = getOrCreateCart();
+	    Cart cart = getOrCreateCart();
 
-		List<CartItemDTO> itemDtos = cart.getItems().stream().map(item -> {
-			// Qiyməti endirimə görə seçirik
-			Double price = (item.getPerfume().getDiscountPrice() != null) ? item.getPerfume().getDiscountPrice()
-					: item.getPerfume().getPrice();
+	    List<CartItemDTO> itemDtos = cart.getItems().stream().map(item -> {
+	        Perfume p = item.getPerfume();
+	        
+	        // Müştərinin real ödəyəcəyi tək vahid qiyməti tapırıq
+	        Double effectivePrice = (p.getDiscountPrice() != null && p.getDiscountPrice() > 0) 
+	                                ? p.getDiscountPrice() 
+	                                : p.getPrice();
 
-			return new CartItemDTO(item.getId(), item.getPerfume().getId(), item.getPerfume().getName(),
-					item.getPerfume().getBrand(), price, item.getQuantity(), price * item.getQuantity(),item.getPerfume().getImageUrl());
-		}).toList();
+	        return new CartItemDTO(
+	            item.getId(),
+	            p.getId(),
+	            p.getName(),
+	            p.getBrand(),
+	            p.getPrice(),          // 1. Həmişə orijinal qiyməti göndər
+	            p.getDiscountPrice(),   // 2. Varsa endirimli qiyməti göndər
+	            item.getQuantity(),
+	            effectivePrice * item.getQuantity(), // 3. Cəmi real qiymət üzərindən hesabla
+	            p.getImageUrl()
+	        );
+	    }).toList();
 
-		Double total = itemDtos.stream().mapToDouble(CartItemDTO::getSubTotal).sum();
+	    // Səbətin ümumi məbləği (bütün subTotal-ların cəmi)
+	    Double total = itemDtos.stream().mapToDouble(CartItemDTO::getSubTotal).sum();
 
-		CartDTO cartDto = new CartDTO();
-		cartDto.setItems(itemDtos);
-		cartDto.setTotalAmount(total);
-		return cartDto;
+	    CartDTO cartDto = new CartDTO();
+	    cartDto.setItems(itemDtos);
+	    cartDto.setTotalAmount(total);
+	    return cartDto;
 	}
 
 	// 4. Səbətdən məhsul sil

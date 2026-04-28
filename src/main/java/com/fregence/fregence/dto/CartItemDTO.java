@@ -12,7 +12,8 @@ public class CartItemDTO {
 	private Long perfumeId;
 	private String perfumeName;
 	private String brand;
-	private Double price; // Endirim varsa endirimli qiymət
+	private Double price;
+	private Double discountPrice;// Endirim varsa endirimli qiymət
 	private Integer quantity;
 	private Double subTotal; // price * quantity
 	private String imageUrl;
