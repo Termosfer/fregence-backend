@@ -180,36 +180,56 @@ public class OrderService {
 	}
 
 	private OrderResponseDTO convertToResponseDTO(Order order) {
-		OrderResponseDTO dto = new OrderResponseDTO();
-		dto.setId(order.getId());
-		if (order.getOrderItems() != null && !order.getOrderItems().isEmpty()) {
+	    OrderResponseDTO dto = new OrderResponseDTO();
+	    
+	    // 1. Sifarişin təməl məlumatlarını mənimsədirik
+	    dto.setId(order.getId());
+	    dto.setAddress(order.getAddress());
+	    dto.setPhoneNumber(order.getPhoneNumber());
+	    dto.setOrderNote(order.getOrderNote());
+	    dto.setStatus(order.getStatus());
+	    dto.setOrderDate(order.getOrderDate());
+	    dto.setPreferredDeliveryTime(order.getPreferredDeliveryTime());
+	    dto.setTotalAmount(order.getTotalAmount());
+
+	    // 2. Müştəri məlumatlarını (User obyektindən) doldururuq
+	    if (order.getUser() != null) {
+	        dto.setCustomerName(order.getUser().getName());
+	        dto.setCustomerEmail(order.getUser().getEmail());
+	    }
+
+	    // 3. Kuryer məlumatlarını doldururuq
+	    dto.setCourierName(order.getCourierName());
+	    dto.setCourierPhone(order.getCourierPhone());
+	    dto.setEstimatedDeliveryTime(order.getEstimatedDeliveryTime());
+
+	    // 4. Sifarişdəki məhsulları (items) DTO-ya çeviririk
+	    if (order.getOrderItems() != null && !order.getOrderItems().isEmpty()) {
 	        List<OrderItemDTO> itemDtos = order.getOrderItems().stream().map(item -> {
 	            OrderItemDTO idto = new OrderItemDTO();
 	            idto.setId(item.getId());
 	            idto.setPerfumeId(item.getPerfume() != null ? item.getPerfume().getId() : null);
 	            idto.setPerfumeName(item.getPerfumeName());
 	            
-	            // Brend və Şəkil məlumatlarını götürürük
+	            // Brend və Şəkil məlumatlarını 'Perfume' obyektindən çəkirik
 	            if (item.getPerfume() != null) {
 	                idto.setBrand(item.getPerfume().getBrand());
 	                idto.setImageUrl(item.getPerfume().getImageUrl());
 	            }
 
-	            // Qiyməti bazada donmuş (snapshot) dəyərdən götürürük
+	            // Bazada donmuş (snapshot) qiyməti götürürük
 	            double price = item.getPriceAtPurchase() != null ? item.getPriceAtPurchase() : 0.0;
 	            idto.setPrice(price);
 	            idto.setQuantity(item.getQuantity());
-	            
-	            // Subtotal-ı burada yenidən hesablayırıq ki, 0 görsənməsin
 	            idto.setSubTotal(price * item.getQuantity());
 	            
 	            return idto;
-			}).toList();
-			dto.setItems(itemDtos);
-		} else {
-			dto.setItems(new ArrayList<>());
-		}
+	        }).toList();
+	        dto.setItems(itemDtos);
+	    } else {
+	        dto.setItems(new ArrayList<>());
+	    }
 
-		return dto;
+	    return dto;
 	}
 }
