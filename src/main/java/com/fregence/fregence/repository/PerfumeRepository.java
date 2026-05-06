@@ -13,44 +13,39 @@ import java.util.List;
 
 public interface PerfumeRepository extends JpaRepository<Perfume, Long> {
 
-    // 1. Ad və ya Brenda görə axtarış (Pagination ilə)
+    // 1. Təkmilləşdirilmiş Multi-Filtr (İndi ML (ölçü) də daxildir)
+    @Query("SELECT DISTINCT p FROM Perfume p LEFT JOIN p.variants v WHERE " +
+           "(:brand IS NULL OR p.brand = :brand) AND " + 
+           "(:gender IS NULL OR p.gender = :gender) AND " +
+           "(:ml IS NULL OR v.ml = :ml) AND " +
+           "(:minPrice IS NULL OR v.price >= :minPrice) AND " +
+           "(:maxPrice IS NULL OR v.price <= :maxPrice)")
+    Page<Perfume> filterPerfumes(
+        @Param("brand") String brand, 
+        @Param("gender") Gender gender, 
+        @Param("minPrice") Double minPrice, 
+        @Param("maxPrice") Double maxPrice, 
+        @Param("ml") Integer ml, 
+        Pageable pageable);
+
+    // 2. Bazadakı bütün unikal ölçüləri (ml) gətirir (Sidebar-da 30, 50, 100 göstərmək üçün)
+    @Query("SELECT DISTINCT v.ml FROM PerfumeVariant v ORDER BY v.ml ASC")
+    List<Integer> findAllUniqueSizes();
+
+    // 3. Stokda cəmi 3 və ya daha az qalmış variantları olan ətirləri tapır (Flash Sale üçün)
+    @Query("SELECT DISTINCT p FROM Perfume p JOIN p.variants v WHERE v.stock > 0 AND v.stock <= 3")
+    List<Perfume> findLowStockPerfumes();
+
+    // --- Mövcud metodlarının qorunmuş variantları ---
+
     Page<Perfume> findByNameContainingIgnoreCaseOrBrandContainingIgnoreCase(String name, String brand, Pageable pageable);
 
-    // 2. Cinsə (Gender) görə filtrləmə
-    Page<Perfume> findByGender(Gender gender, Pageable pageable);
-
-    // 3. Brendə görə filtrləmə
-    Page<Perfume> findByBrandIgnoreCase(String brand, Pageable pageable);
-
-    // 4. Qiymət aralığına görə filtrləmə (Məs: 50 AZN - 200 AZN arası)
-    Page<Perfume> findByPriceBetween(Double minPrice, Double maxPrice, Pageable pageable);
-
-    // 5. Yalnız endirimdə olan ətirləri gətir (discountPrice-ı null olmayanlar)
-    Page<Perfume> findByDiscountPriceIsNotNull(Pageable pageable);
-
-    // 6. Yeni gələn məhsullar
     List<Perfume> findByIsNewTrue();
 
-    // 7. Professional Bonus: Çoxlu filtr (Eyni anda Brend, Gender və Qiymət yoxlaması üçün)
-    @Query("SELECT p FROM Perfume p WHERE " +
-    	       "(:brand IS NULL OR p.brand = :brand) AND " + 
-    	       "(:gender IS NULL OR p.gender = :gender) AND " +
-    	       "(:minPrice IS NULL OR p.price >= :minPrice) AND " +
-    	       "(:maxPrice IS NULL OR p.price <= :maxPrice)")
-    	Page<Perfume> filterPerfumes(
-    	    @Param("brand") String brand, 
-    	    @Param("gender") Gender gender, 
-    	    @Param("minPrice") Double minPrice, 
-    	    @Param("maxPrice") Double maxPrice, 
-    	    Pageable pageable);
-    
- // 1. Tövsiyə olunanları gətir (Məsələn: Ana səhifə slaydşousu üçün)
-    java.util.List<Perfume> findByIsRecommendedTrue();
+    List<Perfume> findByIsRecommendedTrue();
 
-    // 2. Oxşar ətirləri gətir (Eyni brenddən olan 4 dənə ətir, amma baxılan ətir özü siyahıda olmasın)
-    java.util.List<Perfume> findTop4ByBrandAndIdNot(String brand, Long id);
-    
- // Bütün unikal brendləri əlifba sırası ilə gətirir
     @Query("SELECT DISTINCT p.brand FROM Perfume p ORDER BY p.brand ASC")
     List<String> findUniqueBrands();
+
+    List<Perfume> findTop4ByBrandAndIdNot(String brand, Long id);
 }

@@ -70,48 +70,53 @@ public class PerfumeController {
 	// 4. Filtrləmə (Bunu da PagedResponse edirik!)
 	@GetMapping("/filter")
 	public ResponseEntity<PagedResponse<PerfumeDTO>> filter(@RequestParam(required = false) String brand,
-			@RequestParam(required = false) Gender gender, @RequestParam(required = false) Double minPrice,
-			@RequestParam(required = false) Double maxPrice, @RequestParam(defaultValue = "0") int page,
-			@RequestParam(defaultValue = "12") int size, @RequestParam(defaultValue = "id") String sortBy, // <--- Əlavə
-																											// edildi
-			@RequestParam(defaultValue = "desc") String direction // <--- Əlavə edildi
-	) {
-		// Sıralama məntiqini bura da əlavə edirik
+			@RequestParam(required = false) Gender gender, @RequestParam(required = false) Integer ml, // <--- BU
+																										// MÜTLƏQDİR
+																										// (30, 50, 100
+																										// üçün)
+			@RequestParam(required = false) Double minPrice, @RequestParam(required = false) Double maxPrice,
+			@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "12") int size,
+			@RequestParam(defaultValue = "id") String sortBy, @RequestParam(defaultValue = "desc") String direction) {
+		// Sıralama məntiqi
 		Sort sort = direction.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
 		Pageable pageable = PageRequest.of(page, size, sort);
-		return ResponseEntity.ok(service.filterPerfumes(brand, gender, minPrice, maxPrice, pageable));
+
+		// Service-ə 'ml' parametrini də göndəririk
+		return ResponseEntity.ok(service.filterPerfumes(brand, gender, ml, minPrice, maxPrice, pageable));
 	}
 
 	// 5. Update
 	// 5. ADMIN: Yeniləmək (Edit) - Artıq şəkil dəyişməyi də dəstəkləyir
 	@PutMapping(value = "/{id}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
-	public ResponseEntity<PerfumeDTO> update(
-	        @PathVariable Long id,
-	        @RequestPart("perfume") String perfumeJson, // JSON string kimi alırıq
-	        @RequestPart(value = "image", required = false) MultipartFile image) throws Exception {
-	    
-	    // 1. Gələn JSON stringini obyekti çeviririk
-	    ObjectMapper objectMapper = new ObjectMapper();
-	    Perfume updatedData = objectMapper.readValue(perfumeJson, Perfume.class);
+	public ResponseEntity<PerfumeDTO> update(@PathVariable Long id, @RequestPart("perfume") String perfumeJson, // JSON
+																												// string
+																												// kimi
+																												// alırıq
+			@RequestPart(value = "image", required = false) MultipartFile image) throws Exception {
 
-	    // 2. Bazadakı mövcud ətiri tapırıq
-	    // (Bunu Service-də etmək daha yaxşıdır, amma hazırkı strukturuna uyğun yazıram)
-	    PerfumeDTO existingPerfumeDto = service.getPerfumeById(id);
-	    
-	    // 3. Əgər yeni şəkil göndərilibsə, köhnəni silib yenisini yükləyirik
-	    if (image != null && !image.isEmpty()) {
-	        // Mövcud ətirin imagePublicId-sini tapmaq üçün bizə Entity lazımdır
-	        // Sənin PerfumeService.updatePerfume metodun artıq bu işi görməlidir.
-	        // Gəl sadəcə datanı Service-ə ötürək, o hər şeyi həll etsin.
-	        
-	        Map<String, String> imageData = fileService.uploadImage(image);
-	        updatedData.setImageUrl(imageData.get("url"));
-	        updatedData.setImagePublicId(imageData.get("public_id"));
-	    }
+		// 1. Gələn JSON stringini obyekti çeviririk
+		ObjectMapper objectMapper = new ObjectMapper();
+		Perfume updatedData = objectMapper.readValue(perfumeJson, Perfume.class);
 
-	    // 4. Yenilənmiş məlumatları Service-ə göndəririk
-	    return ResponseEntity.ok(service.updatePerfume(id, updatedData));
+		// 2. Bazadakı mövcud ətiri tapırıq
+		// (Bunu Service-də etmək daha yaxşıdır, amma hazırkı strukturuna uyğun yazıram)
+		PerfumeDTO existingPerfumeDto = service.getPerfumeById(id);
+
+		// 3. Əgər yeni şəkil göndərilibsə, köhnəni silib yenisini yükləyirik
+		if (image != null && !image.isEmpty()) {
+			// Mövcud ətirin imagePublicId-sini tapmaq üçün bizə Entity lazımdır
+			// Sənin PerfumeService.updatePerfume metodun artıq bu işi görməlidir.
+			// Gəl sadəcə datanı Service-ə ötürək, o hər şeyi həll etsin.
+
+			Map<String, String> imageData = fileService.uploadImage(image);
+			updatedData.setImageUrl(imageData.get("url"));
+			updatedData.setImagePublicId(imageData.get("public_id"));
+		}
+
+		// 4. Yenilənmiş məlumatları Service-ə göndəririk
+		return ResponseEntity.ok(service.updatePerfume(id, updatedData));
 	}
+
 	// 6. Delete
 	@DeleteMapping("/{id}")
 	public ResponseEntity<String> delete(@PathVariable Long id) {

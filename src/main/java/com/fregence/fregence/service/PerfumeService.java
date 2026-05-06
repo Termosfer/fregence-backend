@@ -1,191 +1,206 @@
 package com.fregence.fregence.service;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.fregence.fregence.entity.Perfume;
-import com.fregence.fregence.entity.Gender;
-import com.fregence.fregence.entity.OrderItem;
-import com.fregence.fregence.config.RedisConfig;
 import com.fregence.fregence.dto.PagedResponse;
-import com.fregence.fregence.dto.PerfumeDTO; // DTO importu mütləqdir
+import com.fregence.fregence.dto.PerfumeDTO;
+import com.fregence.fregence.dto.PerfumeVariantDTO;
+import com.fregence.fregence.entity.Perfume;
+import com.fregence.fregence.entity.PerfumeVariant;
+import com.fregence.fregence.entity.OrderItem;
+import com.fregence.fregence.entity.Gender;
 import com.fregence.fregence.repository.CartItemRepository;
 import com.fregence.fregence.repository.OrderItemRepository;
 import com.fregence.fregence.repository.PerfumeRepository;
 import com.fregence.fregence.repository.WishlistRepository;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
-
 @Service
 public class PerfumeService {
 
-	private final RedisConfig redisConfig;
+    private final PerfumeRepository repository;
+    private final FileService fileService;
+    
+    @Autowired private OrderItemRepository orderItemRepository;
+    @Autowired private WishlistRepository wishlistRepository;
+    @Autowired private CartItemRepository cartItemRepository;
 
-	private final FileService fileService;
+    public PerfumeService(PerfumeRepository repository, FileService fileService) {
+        this.repository = repository;
+        this.fileService = fileService;
+    }
 
-	@Autowired
-	private OrderItemRepository orderItemRepository;
+    @CacheEvict(value = {"perfumes", "perfume-details", "perfume-related"}, allEntries = true)
+    @Transactional
+    public PerfumeDTO savePerfume(Perfume perfume) {
+        if (perfume.getVariants() != null) {
+            perfume.getVariants().forEach(variant -> variant.setPerfume(perfume));
+        }
+        Perfume savedPerfume = repository.save(perfume);
+        return convertToDto(savedPerfume);
+    }
 
-	private final PerfumeRepository repository;
-	@Autowired
-	private WishlistRepository wishlistRepository;
-	@Autowired
-	private CartItemRepository cartItemRepository;
+    @Cacheable(value = "perfumes", key = "(#query ?: 'default') + '-' + #pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort.toString()")
+    public PagedResponse<PerfumeDTO> getAllPerfumes(String query, Pageable pageable) {
+        Page<Perfume> perfumes;
+        if (query != null && !query.isEmpty()) {
+            perfumes = repository.findByNameContainingIgnoreCaseOrBrandContainingIgnoreCase(query, query, pageable);
+        } else {
+            perfumes = repository.findAll(pageable);
+        }
 
-	public PerfumeService(PerfumeRepository repository, FileService fileService, RedisConfig redisConfig) {
-		this.repository = repository;
-		this.fileService = fileService;
-		this.redisConfig = redisConfig;
-	}
+        return new PagedResponse<>(
+            perfumes.getContent().stream().map(this::convertToDto).toList(),
+            perfumes.getNumber(),
+            perfumes.getSize(),
+            perfumes.getTotalElements(),
+            perfumes.getTotalPages(),
+            perfumes.isLast()
+        );
+    }
 
-	// 1. Yeni ətir əlavə etmək (DTO qaytarır)
-	// 2. Yeni ətir əlavə olunanda köhnə keş (siyahı) artıq yalandır, onu sil!
-	@CacheEvict(value = {"perfumes", "perfume-details", "perfume-related"}, allEntries = true)
-	@Transactional
-	public PerfumeDTO savePerfume(Perfume perfume) {
-		Perfume savedPerfume = repository.save(perfume);
-		return convertToDto(savedPerfume);
-	}
+    @Cacheable(value = "perfumes", key = "'all-brands'")
+    public List<String> getAllBrands() {
+        return repository.findUniqueBrands();
+    }
 
-	// 2. Bütün ətirləri və ya axtarışa görə gətirmək (Page<DTO> qaytarır)
-	// 1. Siyahını gətirəndə Redis-ə bax, yoxdursa bazadan götür və Redis-ə qoy
-	@Cacheable(value = "perfumes", key = "(#query ?: 'default') + '-' + #pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort.toString()")
-	public PagedResponse<PerfumeDTO> getAllPerfumes(String query, Pageable pageable) {
-		Page<Perfume> perfumes;
-		if (query != null && !query.isEmpty()) {
-			perfumes = repository.findByNameContainingIgnoreCaseOrBrandContainingIgnoreCase(query, query, pageable);
-		} else {
-			perfumes = repository.findAll(pageable);
-		}
+    @Cacheable(value = "perfume-details", key = "#id")
+    public PerfumeDTO getPerfumeById(Long id) {
+        Perfume perfume = repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Perfume not found with id: " + id));
+        return convertToDto(perfume);
+    }
 
-		// Page-i PagedResponse-a çeviririk
-		Page<PerfumeDTO> dtoPage = perfumes.map(this::convertToDto);
+    @CacheEvict(value = {"perfumes", "perfume-details", "perfume-related"}, allEntries = true)
+    @Transactional
+    public PerfumeDTO updatePerfume(Long id, Perfume updatedPerfume) {
+        Perfume existingPerfume = repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Perfume not found"));
 
-		return new PagedResponse<>(dtoPage.getContent(), dtoPage.getNumber(), dtoPage.getSize(),
-				dtoPage.getTotalElements(), dtoPage.getTotalPages(), dtoPage.isLast());
-	}
+        existingPerfume.setName(updatedPerfume.getName());
+        existingPerfume.setBrand(updatedPerfume.getBrand());
+        existingPerfume.setDescription(updatedPerfume.getDescription());
+        if (updatedPerfume.getImageUrl() != null) {
+            existingPerfume.setImageUrl(updatedPerfume.getImageUrl());
+        }
+        existingPerfume.setGender(updatedPerfume.getGender());
+        existingPerfume.setIsNew(updatedPerfume.getIsNew());
+        existingPerfume.setIsRecommended(updatedPerfume.getIsRecommended());
 
-	// Brendləri gətirir və Redis-də keşləyir
-	@Cacheable(value = "perfumes", key = "'all-brands'")
-	public List<String> getAllBrands() {
-		return repository.findUniqueBrands();
-	}
+        // Variantları yeniləyirik
+        if (updatedPerfume.getVariants() != null) {
+            existingPerfume.getVariants().clear();
+            updatedPerfume.getVariants().forEach(v -> {
+                v.setPerfume(existingPerfume);
+                existingPerfume.getVariants().add(v);
+            });
+        }
 
-	// 3. ID-yə görə tək bir ətir (DTO qaytarır)
-	public PerfumeDTO getPerfumeById(Long id) {
-		Perfume perfume = repository.findById(id)
-				.orElseThrow(() -> new RuntimeException("Perfume not found with id: " + id));
-		return convertToDto(perfume);
-	}
+        return convertToDto(repository.save(existingPerfume));
+    }
 
-	// 4. Ətiri redaktə etmək (DTO qaytarır)
-	@CacheEvict(value = {"perfumes", "perfume-details", "perfume-related"}, allEntries = true)
-	@Transactional
-	public PerfumeDTO updatePerfume(Long id, Perfume updatedPerfume) {
-		Perfume existingPerfume = repository.findById(id).orElseThrow(() -> new RuntimeException("Perfume not found"));
+    @CacheEvict(value = {"perfumes", "perfume-details", "perfume-related"}, allEntries = true)
+    @Transactional
+    public void deletePerfume(Long id) {
+        Perfume perfume = repository.findById(id).orElseThrow(() -> new RuntimeException("Perfume not found"));
 
-		existingPerfume.setName(updatedPerfume.getName());
-		existingPerfume.setBrand(updatedPerfume.getBrand());
-		existingPerfume.setPrice(updatedPerfume.getPrice());
-		existingPerfume.setDiscountPrice(updatedPerfume.getDiscountPrice());
-		existingPerfume.setDescription(updatedPerfume.getDescription());
-		if (updatedPerfume.getImageUrl() != null) {
-			existingPerfume.setImageUrl(updatedPerfume.getImageUrl());
-		}
-		existingPerfume.setMl(updatedPerfume.getMl());
-		existingPerfume.setGender(updatedPerfume.getGender());
-		existingPerfume.setStock(updatedPerfume.getStock());
-		existingPerfume.setIsNew(updatedPerfume.getIsNew());
-		// Recommendation sahəsini buradan sildik
+        // Referansları təmizləyirik
+        List<OrderItem> orderItems = orderItemRepository.findByPerfumeId(id);
+        if (!orderItems.isEmpty()) {
+            orderItems.forEach(item -> item.setPerfume(null));
+            orderItemRepository.saveAll(orderItems);
+        }
 
-		return convertToDto(repository.save(existingPerfume));
-	}
+        wishlistRepository.deleteByPerfume(perfume);
+        cartItemRepository.deleteByPerfume(perfume);
 
-	// 5. Ətiri silmək
-	// 3. Ətir silinəndə də keşi təmizlə
-	@CacheEvict(value = {"perfumes", "perfume-details", "perfume-related"}, allEntries = true)
-	@Transactional
-	public void deletePerfume(Long id) {
-		// 1. Məhsulun mövcudluğunu yoxla
-		Perfume perfume = repository.findById(id).orElseThrow(() -> new RuntimeException("Perfume not found"));
+        if (perfume.getImagePublicId() != null) {
+            fileService.deleteImage(perfume.getImagePublicId());
+        }
 
-		// 2. VACİB: OrderItem-lərdəki referansı null et (Snapshot qalır, əlaqə
-		// qırılır)
-		// Bu, "Foreign Key Constraint" xətasının qarşısını alır
-		List<OrderItem> orderItems = orderItemRepository.findByPerfumeId(id);
-		if (!orderItems.isEmpty()) {
-			orderItems.forEach(item -> item.setPerfume(null));
-			orderItemRepository.saveAll(orderItems);
-		}
+        repository.delete(perfume);
+    }
 
-		// 3. Wishlist və Səbətdən tamamilə sil (çünki artıq alınmayan məhsul buralarda
-		// qalmamalıdır)
-		wishlistRepository.deleteByPerfume(perfume);
-		cartItemRepository.deleteByPerfume(perfume);
+    @Cacheable(value = "perfumes", key = "'filter-' + (#brand ?: 'all') + '-' + (#gender ?: 'all') + '-' + (#ml ?: 'all') + '-' + (#minPrice ?: '0') + '-' + (#maxPrice ?: 'max') + '-' + #pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort.toString()")
+    public PagedResponse<PerfumeDTO> filterPerfumes(String brand, Gender gender, Integer ml, Double minPrice, Double maxPrice, Pageable pageable) {
+        Page<Perfume> perfumes = repository.filterPerfumes(brand, gender, minPrice, maxPrice, ml, pageable);
+        
+        return new PagedResponse<>(
+            perfumes.getContent().stream().map(this::convertToDto).toList(),
+            perfumes.getNumber(),
+            perfumes.getSize(),
+            perfumes.getTotalElements(),
+            perfumes.getTotalPages(),
+            perfumes.isLast()
+        );
+    }
 
-		// 4. Cloudinary-dən şəkli sil
-		if (perfume.getImagePublicId() != null) {
-			fileService.deleteImage(perfume.getImagePublicId());
-		}
+    @Cacheable(value = "perfumes", key = "'recommendations'")
+    public List<PerfumeDTO> getRecommendedPerfumes() {
+        return repository.findByIsRecommendedTrue().stream().map(this::convertToDto).toList();
+    }
 
-		// 5. Nəhayət, əsas cədvəldən məhsulu sil
-		repository.delete(perfume);
-	}
+    @Cacheable(value = "perfume-related", key = "#id")
+    public List<PerfumeDTO> getRelatedPerfumes(Long id) {
+        Perfume perfume = repository.findById(id).orElseThrow(() -> new RuntimeException("Perfume not found"));
+        return repository.findTop4ByBrandAndIdNot(perfume.getBrand(), id).stream().map(this::convertToDto).toList();
+    }
 
-	// 6. Filtr Metodu (PagedResponse qaytarır və Redis-də keşlənir)
-	@Cacheable(value = "perfumes", key = "'filter-' + (#brand ?: 'all') + '-' + (#gender ?: 'all') + '-' + (#minPrice ?: '0') + '-' + (#maxPrice ?: 'max') + '-' + #pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort.toString()")
-	public PagedResponse<PerfumeDTO> filterPerfumes(String brand, Gender gender, Double minPrice, Double maxPrice,
-			Pageable pageable) {
+    // --- BU METOD MÜTLƏQ OLMALIDIR (Mapping) ---
+    private PerfumeDTO convertToDto(Perfume perfume) {
+        PerfumeDTO dto = new PerfumeDTO();
+        dto.setId(perfume.getId());
+        dto.setBrand(perfume.getBrand());
+        dto.setName(perfume.getName());
+        dto.setDescription(perfume.getDescription());
+        dto.setImageUrl(perfume.getImageUrl());
+        dto.setIsNew(perfume.getIsNew());
+        dto.setIsRecommended(perfume.getIsRecommended());
 
-		// 1. Bazadan Page<Perfume> (Entity) gətiririk
-		Page<Perfume> perfumes = repository.filterPerfumes(brand, gender, minPrice, maxPrice, pageable);
+        if (perfume.getGender() != null) {
+            dto.setGender(perfume.getGender().name());
+        }
 
-		// 2. Entity-ləri DTO-ya çeviririk
-		Page<PerfumeDTO> dtoPage = perfumes.map(this::convertToDto);
+        if (perfume.getVariants() != null && !perfume.getVariants().isEmpty()) {
+            List<PerfumeVariantDTO> variantDtos = perfume.getVariants().stream().map(v -> {
+                PerfumeVariantDTO vDto = new PerfumeVariantDTO();
+                vDto.setId(v.getId());
+                vDto.setMl(v.getMl());
+                vDto.setPrice(v.getPrice());
+                vDto.setDiscountPrice(v.getDiscountPrice());
+                vDto.setStock(v.getStock());
 
-		// 3. PagedResponse obyektinə büküb qaytarırıq
-		return new PagedResponse<>(dtoPage.getContent(), dtoPage.getNumber(), dtoPage.getSize(),
-				dtoPage.getTotalElements(), dtoPage.getTotalPages(), dtoPage.isLast());
-	}
-	@Cacheable(value = "perfumes", key = "'recommendations'")
-	public java.util.List<PerfumeDTO> getRecommendedPerfumes() {
-		return repository.findByIsRecommendedTrue().stream().map(this::convertToDto)
-				.collect(java.util.stream.Collectors.toList());
-	}
-	@Cacheable(value = "perfume-related", key = "#id")
-	public java.util.List<PerfumeDTO> getRelatedPerfumes(Long id) {
-		// Əvvəlcə baxılan ətiri tapırıq ki, brendini bilək
-		Perfume perfume = repository.findById(id).orElseThrow(() -> new RuntimeException("Perfume not found"));
+                if (v.getStock() > 0 && v.getStock() <= 3) {
+                    vDto.setLowStock(true);
+                    vDto.setStockMessage("Only " + v.getStock() + " left!");
+                } else if (v.getStock() == 0) {
+                    vDto.setLowStock(false);
+                    vDto.setStockMessage("Out of Stock");
+                }
+                return vDto;
+            }).toList();
 
-		return repository.findTop4ByBrandAndIdNot(perfume.getBrand(), id).stream().map(this::convertToDto)
-				.collect(java.util.stream.Collectors.toList());
-	}
+            dto.setVariants(variantDtos);
 
-	// 7. Entity-ni DTO-ya çevirən köməkçi metod
-	private PerfumeDTO convertToDto(Perfume perfume) {
-		PerfumeDTO dto = new PerfumeDTO();
-		dto.setId(perfume.getId());
-		dto.setBrand(perfume.getBrand());
-		dto.setName(perfume.getName());
-		dto.setPrice(perfume.getPrice());
-		dto.setDiscountPrice(perfume.getDiscountPrice());
-		dto.setImageUrl(perfume.getImageUrl());
-		dto.setDescription(perfume.getDescription());
-		dto.setMl(perfume.getMl());
+            Double minPrice = variantDtos.stream()
+                .map(v -> (v.getDiscountPrice() != null && v.getDiscountPrice() > 0) ? v.getDiscountPrice() : v.getPrice())
+                .min(Comparator.naturalOrder())
+                .orElse(0.0);
+            
+            dto.setPrice(minPrice);
+        }
 
-		if (perfume.getGender() != null) {
-			dto.setGender(perfume.getGender().name());
-		}
-
-		dto.setIsNew(perfume.getIsNew());
-		dto.setIsRecommended(perfume.getIsRecommended());
-		return dto;
-	}
+        return dto;
+    }
 }

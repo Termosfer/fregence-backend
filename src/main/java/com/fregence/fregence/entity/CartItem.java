@@ -15,9 +15,11 @@ public class CartItem {
     @JoinColumn(name = "cart_id")
     private Cart cart;
 
+ // KÖHNƏ: private Perfume perfume;
+    // YENİ: Artıq variantı saxlayırıq (qiymət bunun içindədir)
     @ManyToOne
-    @JoinColumn(name = "perfume_id")
-    private Perfume perfume;
+    @JoinColumn(name = "variant_id")
+    private PerfumeVariant perfumeVariant; 
 
     private Integer quantity; // Məhsulun sayı
 }

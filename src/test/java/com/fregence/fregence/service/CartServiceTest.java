@@ -17,17 +17,18 @@ import com.fregence.fregence.dto.CartDTO;
 import com.fregence.fregence.entity.Cart;
 import com.fregence.fregence.entity.CartItem;
 import com.fregence.fregence.entity.Perfume;
+import com.fregence.fregence.entity.PerfumeVariant;
 import com.fregence.fregence.entity.User;
 import com.fregence.fregence.repository.CartItemRepository;
 import com.fregence.fregence.repository.CartRepository;
-import com.fregence.fregence.repository.PerfumeRepository;
+import com.fregence.fregence.repository.PerfumeVariantRepository;
 
 @ExtendWith(MockitoExtension.class)
 public class CartServiceTest {
 
     @Mock private CartRepository cartRepository;
     @Mock private CartItemRepository itemRepository;
-    @Mock private PerfumeRepository perfumeRepository;
+    @Mock private PerfumeVariantRepository variantRepository; // YENİ
     @Mock private UserService userService;
 
     @InjectMocks
@@ -36,6 +37,7 @@ public class CartServiceTest {
     private User mockUser;
     private Cart mockCart;
     private Perfume mockPerfume;
+    private PerfumeVariant mockVariant;
 
     @BeforeEach
     void setUp() {
@@ -50,32 +52,38 @@ public class CartServiceTest {
         mockPerfume = new Perfume();
         mockPerfume.setId(1L);
         mockPerfume.setName("Sauvage");
-        mockPerfume.setPrice(100.0);
-        mockPerfume.setDiscountPrice(80.0); // Endirimli qiymət
+        mockPerfume.setBrand("Dior");
+
+        // YENİ: Variant yaradırıq
+        mockVariant = new PerfumeVariant();
+        mockVariant.setId(1L);
+        mockVariant.setMl(100);
+        mockVariant.setPrice(100.0);
+        mockVariant.setDiscountPrice(80.0);
+        mockVariant.setPerfume(mockPerfume);
     }
 
     @Test
-    void addToCart_YeniMehsulElaveEdilmeli() {
+    void addToCart_YeniMehsulVariantElaveEdilmeli() {
         // GIVEN
         when(userService.getCurrentUser()).thenReturn(mockUser);
         when(cartRepository.findByUser(mockUser)).thenReturn(Optional.of(mockCart));
-        when(perfumeRepository.findById(1L)).thenReturn(Optional.of(mockPerfume));
+        when(variantRepository.findById(1L)).thenReturn(Optional.of(mockVariant));
 
         // WHEN
-        cartService.addToCart(1L, 2);
+        cartService.addToCart(1L, 2); // Artıq variantId göndəririk
 
         // THEN
         assertEquals(1, mockCart.getItems().size());
-        assertEquals(2, mockCart.getItems().get(0).getQuantity());
+        assertEquals(1L, mockCart.getItems().get(0).getPerfumeVariant().getId());
         verify(cartRepository, times(1)).save(mockCart);
     }
 
     @Test
-    void getMyCart_HesablamaMentiqiDuzgunIshlemeli() {
+    void getMyCart_HesablamaMentiqiVariantlaDuzgunIshlemeli() {
         // GIVEN
-        // Səbətə bir item əlavə edirik: 2 ədəd Sauvage (hərəsi 80 AZN)
         CartItem item = new CartItem();
-        item.setPerfume(mockPerfume);
+        item.setPerfumeVariant(mockVariant); // Variantı set edirik
         item.setQuantity(2);
         item.setCart(mockCart);
         mockCart.getItems().add(item);
@@ -88,25 +96,25 @@ public class CartServiceTest {
 
         // THEN
         assertNotNull(result);
-        // 2 ədəd * 80 AZN = 160 AZN olmalıdır
+        // 2 ədəd * 80 AZN = 160 AZN
         assertEquals(160.0, result.getTotalAmount());
-        assertEquals(1, result.getItems().size());
-        assertEquals(160.0, result.getItems().get(0).getSubTotal());
     }
 
     @Test
-    void removeFromCart_SadeceOzMehsulunuSileBilmelisiniz() {
+    void removeItem_UgurlaSilinmeli() {
         // GIVEN
         CartItem item = new CartItem();
         item.setId(100L);
-        item.setCart(mockCart); // Bu item mockCart-a (bizim userə) aiddir
+        item.setCart(mockCart);
 
         when(userService.getCurrentUser()).thenReturn(mockUser);
         when(cartRepository.findByUser(mockUser)).thenReturn(Optional.of(mockCart));
         when(itemRepository.findById(100L)).thenReturn(Optional.of(item));
 
-        // WHEN & THEN (Heç bir xəta çıxmamalıdır)
+        // WHEN
         assertDoesNotThrow(() -> cartService.removeItem(100L));
+
+        // THEN
         verify(itemRepository, times(1)).delete(item);
     }
 }

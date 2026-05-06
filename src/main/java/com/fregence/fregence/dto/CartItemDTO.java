@@ -8,13 +8,15 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class CartItemDTO {
-	private Long cartItemId;
-	private Long perfumeId;
-	private String perfumeName;
-	private String brand;
-	private Double price;
-	private Double discountPrice;// Endirim varsa endirimli qiymət
-	private Integer quantity;
-	private Double subTotal; // price * quantity
-	private String imageUrl;
+	 private Long cartItemId;
+	    private Long perfumeId;
+	    private Long variantId; // Variant ID-si əlavə olundu
+	    private String perfumeName;
+	    private String brand;
+	    private Integer ml;     // Seçilən ölçü (məs: 50ml)
+	    private Double price;
+	    private Double discountPrice;
+	    private Integer quantity;
+	    private Double subTotal;
+	    private String imageUrl;
 }

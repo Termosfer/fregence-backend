@@ -15,6 +15,8 @@ import com.fregence.fregence.entity.Cart;
 import com.fregence.fregence.entity.CartItem;
 import com.fregence.fregence.entity.Order;
 import com.fregence.fregence.entity.OrderItem;
+import com.fregence.fregence.entity.Perfume;
+import com.fregence.fregence.entity.PerfumeVariant;
 import com.fregence.fregence.entity.User;
 import com.fregence.fregence.repository.CartRepository;
 import com.fregence.fregence.repository.OrderItemRepository;
@@ -70,23 +72,25 @@ public class OrderService {
 		double total = 0;
 
 		for (CartItem cartItem : cart.getItems()) {
+			// VACİB: Artıq variant üzərindən işləyirik
+			PerfumeVariant variant = cartItem.getPerfumeVariant();
+			Perfume p = variant.getPerfume();
+
 			OrderItem orderItem = new OrderItem();
 			orderItem.setOrder(order);
-			orderItem.setPerfume(cartItem.getPerfume());
+			orderItem.setPerfume(p);
 
-			String fullName = cartItem.getPerfume().getBrand() + " " + cartItem.getPerfume().getName();
+			String fullName = p.getBrand() + " " + p.getName() + " (" + variant.getMl() + "ml)";
 			orderItem.setPerfumeName(fullName);
 
-			// Endirimi yalnız null deyilsə VƏ 0-dan böyükdürsə götür:
-			Double price = (cartItem.getPerfume().getDiscountPrice() != null
-					&& cartItem.getPerfume().getDiscountPrice() > 0) ? cartItem.getPerfume().getDiscountPrice()
-							: cartItem.getPerfume().getPrice();
+			// Qiyməti variantdan götürürük
+			Double price = (variant.getDiscountPrice() != null && variant.getDiscountPrice() > 0)
+					? variant.getDiscountPrice()
+					: variant.getPrice();
 
 			orderItem.setPriceAtPurchase(price);
 			orderItem.setQuantity(cartItem.getQuantity());
-
-			// YENİ: Satınalma anındakı şəkli qeyd edirik
-			orderItem.setImageUrlAtPurchase(cartItem.getPerfume().getImageUrl());
+			orderItem.setImageUrlAtPurchase(p.getImageUrl());
 
 			orderItems.add(orderItem);
 			total += price * cartItem.getQuantity();
@@ -97,14 +101,11 @@ public class OrderService {
 
 		Order savedOrder = orderRepository.save(order);
 
-		// VACİB: Telegram bildirişini buraya əlavə edin
 		try {
 			telegramService.sendOrderNotification(savedOrder);
-			messagingTemplate.convertAndSend("/topic/admin-notifications",
-					"Yeni sifariş alındı! #" + savedOrder.getId());
+			messagingTemplate.convertAndSend("/topic/admin-notifications", "Yeni sifariş! #" + savedOrder.getId());
 		} catch (Exception e) {
-			// Sifariş verilməsinə mane olmasın deyə log edirik
-			System.err.println("Bildiriş göndərilə bilmədi: " + e.getMessage());
+			System.err.println("Bildiriş xətası: " + e.getMessage());
 		}
 
 		cart.getItems().clear();
@@ -180,56 +181,56 @@ public class OrderService {
 	}
 
 	private OrderResponseDTO convertToResponseDTO(Order order) {
-	    OrderResponseDTO dto = new OrderResponseDTO();
-	    
-	    // 1. Sifarişin təməl məlumatlarını mənimsədirik
-	    dto.setId(order.getId());
-	    dto.setAddress(order.getAddress());
-	    dto.setPhoneNumber(order.getPhoneNumber());
-	    dto.setOrderNote(order.getOrderNote());
-	    dto.setStatus(order.getStatus());
-	    dto.setOrderDate(order.getOrderDate());
-	    dto.setPreferredDeliveryTime(order.getPreferredDeliveryTime());
-	    dto.setTotalAmount(order.getTotalAmount());
+		OrderResponseDTO dto = new OrderResponseDTO();
 
-	    // 2. Müştəri məlumatlarını (User obyektindən) doldururuq
-	    if (order.getUser() != null) {
-	        dto.setCustomerName(order.getUser().getName());
-	        dto.setCustomerEmail(order.getUser().getEmail());
-	    }
+		// 1. Sifarişin təməl məlumatlarını mənimsədirik
+		dto.setId(order.getId());
+		dto.setAddress(order.getAddress());
+		dto.setPhoneNumber(order.getPhoneNumber());
+		dto.setOrderNote(order.getOrderNote());
+		dto.setStatus(order.getStatus());
+		dto.setOrderDate(order.getOrderDate());
+		dto.setPreferredDeliveryTime(order.getPreferredDeliveryTime());
+		dto.setTotalAmount(order.getTotalAmount());
 
-	    // 3. Kuryer məlumatlarını doldururuq
-	    dto.setCourierName(order.getCourierName());
-	    dto.setCourierPhone(order.getCourierPhone());
-	    dto.setEstimatedDeliveryTime(order.getEstimatedDeliveryTime());
+		// 2. Müştəri məlumatlarını (User obyektindən) doldururuq
+		if (order.getUser() != null) {
+			dto.setCustomerName(order.getUser().getName());
+			dto.setCustomerEmail(order.getUser().getEmail());
+		}
 
-	    // 4. Sifarişdəki məhsulları (items) DTO-ya çeviririk
-	    if (order.getOrderItems() != null && !order.getOrderItems().isEmpty()) {
-	        List<OrderItemDTO> itemDtos = order.getOrderItems().stream().map(item -> {
-	            OrderItemDTO idto = new OrderItemDTO();
-	            idto.setId(item.getId());
-	            idto.setPerfumeId(item.getPerfume() != null ? item.getPerfume().getId() : null);
-	            idto.setPerfumeName(item.getPerfumeName());
-	            
-	            // Brend və Şəkil məlumatlarını 'Perfume' obyektindən çəkirik
-	            if (item.getPerfume() != null) {
-	                idto.setBrand(item.getPerfume().getBrand());
-	                idto.setImageUrl(item.getPerfume().getImageUrl());
-	            }
+		// 3. Kuryer məlumatlarını doldururuq
+		dto.setCourierName(order.getCourierName());
+		dto.setCourierPhone(order.getCourierPhone());
+		dto.setEstimatedDeliveryTime(order.getEstimatedDeliveryTime());
 
-	            // Bazada donmuş (snapshot) qiyməti götürürük
-	            double price = item.getPriceAtPurchase() != null ? item.getPriceAtPurchase() : 0.0;
-	            idto.setPrice(price);
-	            idto.setQuantity(item.getQuantity());
-	            idto.setSubTotal(price * item.getQuantity());
-	            
-	            return idto;
-	        }).toList();
-	        dto.setItems(itemDtos);
-	    } else {
-	        dto.setItems(new ArrayList<>());
-	    }
+		// 4. Sifarişdəki məhsulları (items) DTO-ya çeviririk
+		if (order.getOrderItems() != null && !order.getOrderItems().isEmpty()) {
+			List<OrderItemDTO> itemDtos = order.getOrderItems().stream().map(item -> {
+				OrderItemDTO idto = new OrderItemDTO();
+				idto.setId(item.getId());
+				idto.setPerfumeId(item.getPerfume() != null ? item.getPerfume().getId() : null);
+				idto.setPerfumeName(item.getPerfumeName());
 
-	    return dto;
+				// Brend və Şəkil məlumatlarını 'Perfume' obyektindən çəkirik
+				if (item.getPerfume() != null) {
+					idto.setBrand(item.getPerfume().getBrand());
+					idto.setImageUrl(item.getPerfume().getImageUrl());
+				}
+
+				// Bazada donmuş (snapshot) qiyməti götürürük
+				double price = item.getPriceAtPurchase() != null ? item.getPriceAtPurchase() : 0.0;
+				idto.setPrice(price);
+				idto.setQuantity(item.getQuantity());
+				idto.setSubTotal(price * item.getQuantity());
+
+				return idto;
+			}).toList();
+			dto.setItems(itemDtos);
+		} else {
+			dto.setItems(new ArrayList<>());
+		}
+
+		return dto;
 	}
 }
