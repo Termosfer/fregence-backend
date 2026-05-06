@@ -159,48 +159,59 @@ public class PerfumeService {
 
     // --- BU METOD MÜTLƏQ OLMALIDIR (Mapping) ---
     private PerfumeDTO convertToDto(Perfume perfume) {
-        PerfumeDTO dto = new PerfumeDTO();
-        dto.setId(perfume.getId());
-        dto.setBrand(perfume.getBrand());
-        dto.setName(perfume.getName());
-        dto.setDescription(perfume.getDescription());
-        dto.setImageUrl(perfume.getImageUrl());
-        dto.setIsNew(perfume.getIsNew());
-        dto.setIsRecommended(perfume.getIsRecommended());
+    PerfumeDTO dto = new PerfumeDTO();
+    // ... təməl set-lər (id, brand, name, description, imageUrl və s.) ...
 
-        if (perfume.getGender() != null) {
-            dto.setGender(perfume.getGender().name());
+    if (perfume.getVariants() != null && !perfume.getVariants().isEmpty()) {
+        // 1. Variantları ML-ə görə sıralayırıq (kiçikdən böyüyə)
+        List<PerfumeVariant> sortedVariants = perfume.getVariants().stream()
+                .sorted(Comparator.comparing(PerfumeVariant::getMl))
+                .toList();
+
+        // 2. Variant DTO-larını yaradırıq (Bayaqkı stok mesajları ilə birlikdə)
+        List<PerfumeVariantDTO> variantDtos = sortedVariants.stream().map(v -> {
+            PerfumeVariantDTO vDto = new PerfumeVariantDTO();
+            vDto.setId(v.getId());
+            vDto.setMl(v.getMl());
+            vDto.setPrice(v.getPrice());
+            vDto.setDiscountPrice(v.getDiscountPrice());
+            vDto.setStock(v.getStock());
+            if (v.getStock() > 0 && v.getStock() <= 3) {
+                vDto.setLowStock(true);
+                vDto.setStockMessage("Only " + v.getStock() + " left!");
+            }
+            return vDto;
+        }).toList();
+
+        dto.setVariants(variantDtos);
+
+        // 3. VACİB: DEFAULT ML SEÇİ̇Mİ̇ (Priority: 100 > 75 > Largest)
+        List<Integer> availableMls = sortedVariants.stream()
+                .map(PerfumeVariant::getMl)
+                .toList();
+
+        Integer finalDefaultMl;
+        if (availableMls.contains(100)) {
+            finalDefaultMl = 100;
+        } else if (availableMls.contains(75)) {
+            finalDefaultMl = 75;
+        } else {
+            // Əgər 100 və ya 75 yoxdursa, əldə olan ən böyük ölçünü götür
+            finalDefaultMl = availableMls.get(availableMls.size() - 1);
         }
+        
+        dto.setDefaultMl(finalDefaultMl);
 
-        if (perfume.getVariants() != null && !perfume.getVariants().isEmpty()) {
-            List<PerfumeVariantDTO> variantDtos = perfume.getVariants().stream().map(v -> {
-                PerfumeVariantDTO vDto = new PerfumeVariantDTO();
-                vDto.setId(v.getId());
-                vDto.setMl(v.getMl());
-                vDto.setPrice(v.getPrice());
-                vDto.setDiscountPrice(v.getDiscountPrice());
-                vDto.setStock(v.getStock());
-
-                if (v.getStock() > 0 && v.getStock() <= 3) {
-                    vDto.setLowStock(true);
-                    vDto.setStockMessage("Only " + v.getStock() + " left!");
-                } else if (v.getStock() == 0) {
-                    vDto.setLowStock(false);
-                    vDto.setStockMessage("Out of Stock");
-                }
-                return vDto;
-            }).toList();
-
-            dto.setVariants(variantDtos);
-
-            Double minPrice = variantDtos.stream()
-                .map(v -> (v.getDiscountPrice() != null && v.getDiscountPrice() > 0) ? v.getDiscountPrice() : v.getPrice())
-                .min(Comparator.naturalOrder())
-                .orElse(0.0);
-            
-            dto.setPrice(minPrice);
-        }
-
-        return dto;
+        // 4. Qiymət hesablanması (Min Price)
+        Double calculatedMinPrice = variantDtos.stream()
+            .map(v -> (v.getDiscountPrice() != null && v.getDiscountPrice() > 0) ? v.getDiscountPrice() : v.getPrice())
+            .min(Comparator.naturalOrder())
+            .orElse(0.0);
+        
+        dto.setMinPrice(calculatedMinPrice);
+        dto.setPrice(calculatedMinPrice);
     }
+    
+    return dto;
+}
 }
