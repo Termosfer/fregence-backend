@@ -17,8 +17,8 @@ public class Wishlist {
     private User user;
 
     @ManyToOne
-    @JoinColumn(name = "perfume_id")
-    private Perfume perfume;
+    @JoinColumn(name = "variant_id") // perfume_id yerinə variant_id
+    private PerfumeVariant variant;
 
     private LocalDateTime addedAt = LocalDateTime.now();
 }

@@ -16,16 +16,24 @@ import com.fregence.fregence.service.CartService;
 @RestController
 @RequestMapping("/api/cart")
 public class CartController {
-    @Autowired private CartService cartService;
+    
+    @Autowired 
+    private CartService cartService;
 
     @GetMapping
     public ResponseEntity<CartDTO> getCart() {
         return ResponseEntity.ok(cartService.getMyCart());
     }
 
+    // YENİ: Səbətdəki məhsul növlərinin sayını qaytarır
+    @GetMapping("/count")
+    public ResponseEntity<Integer> getCartCount() {
+        return ResponseEntity.ok(cartService.getCartCount());
+    }
+
     @PostMapping("/add")
-    public ResponseEntity<String> add(@RequestParam Long perfumeId, @RequestParam int quantity) {
-        cartService.addToCart(perfumeId, quantity);
+    public ResponseEntity<String> add(@RequestParam Long variantId, @RequestParam int quantity) {
+        cartService.addToCart(variantId, quantity);
         return ResponseEntity.ok("Məhsul səbətə əlavə edildi.");
     }
 

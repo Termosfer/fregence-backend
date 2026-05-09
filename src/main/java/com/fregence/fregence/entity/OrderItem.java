@@ -15,13 +15,13 @@ public class OrderItem {
     private Order order;
 
     @ManyToOne
-    @JoinColumn(name = "perfume_id", nullable = true)
-    private Perfume perfume;
+    @JoinColumn(name = "variant_id") // Perfume əvəzinə Variant-a bağlayırıq
+    private PerfumeVariant perfumeVariant;
 
     private String perfumeName;
+    private String brandName; // Brendi də saxlamaq yaxşı olar
+    private Integer ml;       // VACİB: 30, 50, 100?
     private Double priceAtPurchase;
     private Integer quantity;
-    
-    // YENİ: Sifariş anındakı şəkil snapshot-u
     private String imageUrlAtPurchase;
 }

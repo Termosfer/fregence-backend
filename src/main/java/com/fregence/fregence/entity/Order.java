@@ -29,6 +29,7 @@ public class Order {
     private String courierPhone;      // Kuryerin əlaqə nömrəsi
     private LocalDateTime estimatedDeliveryTime; // Təxmini çatdırılma vaxtı (Admin tərəfindən təyin olunur)
     
+    private boolean isDeleted = false; 
     
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<OrderItem> orderItems = new ArrayList<>();

@@ -22,9 +22,10 @@ public class PerfumeDTO implements Serializable {
     private Boolean isRecommended;
     
     // ANA SƏHİFƏ ÜÇÜN: "X AZN-dən başlayan" qiyməti göstərmək üçün bunları saxlayırıq
-    private Double minPrice;
+    private Double price;         // Orijinal qiymət
+    private Double discountPrice; // Endirimli qiymət (varsa)
     private Integer defaultMl; 
-    private Double price; 
+    private Double minPrice; 
     // Ətrin bütün ölçü və qiymət variantları:
     private List<PerfumeVariantDTO> variants;
 }

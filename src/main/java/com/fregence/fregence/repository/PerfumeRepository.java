@@ -14,19 +14,19 @@ import java.util.List;
 public interface PerfumeRepository extends JpaRepository<Perfume, Long> {
 
     // 1. Təkmilləşdirilmiş Multi-Filtr (İndi ML (ölçü) də daxildir)
-    @Query("SELECT DISTINCT p FROM Perfume p LEFT JOIN p.variants v WHERE " +
-           "(:brand IS NULL OR p.brand = :brand) AND " + 
-           "(:gender IS NULL OR p.gender = :gender) AND " +
-           "(:ml IS NULL OR v.ml = :ml) AND " +
-           "(:minPrice IS NULL OR v.price >= :minPrice) AND " +
-           "(:maxPrice IS NULL OR v.price <= :maxPrice)")
-    Page<Perfume> filterPerfumes(
-        @Param("brand") String brand, 
-        @Param("gender") Gender gender, 
-        @Param("minPrice") Double minPrice, 
-        @Param("maxPrice") Double maxPrice, 
-        @Param("ml") Integer ml, 
-        Pageable pageable);
+	@Query("SELECT DISTINCT p FROM Perfume p LEFT JOIN p.variants v WHERE " +
+		       "(:brand IS NULL OR p.brand ILIKE :brand) AND " + // ILIKE - Case-insensitive axtarış üçün
+		       "(:gender IS NULL OR p.gender = :gender) AND " +
+		       "(:ml IS NULL OR v.ml = :ml) AND " +
+		       "(:minPrice IS NULL OR v.price >= :minPrice) AND " +
+		       "(:maxPrice IS NULL OR v.price <= :maxPrice)")
+		Page<Perfume> filterPerfumes(
+		    @Param("brand") String brand, 
+		    @Param("gender") Gender gender, 
+		    @Param("minPrice") Double minPrice, 
+		    @Param("maxPrice") Double maxPrice, 
+		    @Param("ml") Integer ml, 
+		    Pageable pageable);
 
     // 2. Bazadakı bütün unikal ölçüləri (ml) gətirir (Sidebar-da 30, 50, 100 göstərmək üçün)
     @Query("SELECT DISTINCT v.ml FROM PerfumeVariant v ORDER BY v.ml ASC")

@@ -27,7 +27,7 @@ public class CartService {
 	@Autowired
 	private CartItemRepository itemRepository;
 	@Autowired
-	private PerfumeVariantRepository variantRepository; // Yeni əlavə olundu
+	private PerfumeVariantRepository variantRepository;
 	@Autowired
 	private UserService userService;
 
@@ -40,22 +40,27 @@ public class CartService {
 		});
 	}
 
-	// 2. Səbətə konkret VARIANT (ölçü) əlavə et
 	@Transactional
 	public void addToCart(Long variantId, int quantity) {
 		Cart cart = getOrCreateCart();
-		
-		// Variantı tapırıq (qiymət və ml buradadır)
+
 		PerfumeVariant variant = variantRepository.findById(variantId)
 				.orElseThrow(() -> new RuntimeException("Product variant not found"));
 
-		// Səbətdə bu konkret variant (məs: eyni ətirin 50ml-i) varmı?
+		if (variant.getStock() < quantity) {
+			throw new RuntimeException("Stokda kifayət qədər məhsul yoxdur! Mövcud: " + variant.getStock());
+		}
+
 		Optional<CartItem> existingItem = cart.getItems().stream()
 				.filter(item -> item.getPerfumeVariant().getId().equals(variantId)).findFirst();
 
 		if (existingItem.isPresent()) {
 			CartItem item = existingItem.get();
-			item.setQuantity(item.getQuantity() + quantity);
+			int newTotal = item.getQuantity() + quantity;
+			if (variant.getStock() < newTotal) {
+				throw new RuntimeException("Səbətinizdəki ilə birlikdə stok limitini keçirsiniz!");
+			}
+			item.setQuantity(newTotal);
 		} else {
 			CartItem newItem = new CartItem();
 			newItem.setCart(cart);
@@ -66,40 +71,32 @@ public class CartService {
 		cartRepository.save(cart);
 	}
 
-	// 3. Səbəti göstərmək (Variant məlumatları ilə)
 	public CartDTO getMyCart() {
-	    Cart cart = getOrCreateCart();
+		Cart cart = getOrCreateCart();
 
-	    List<CartItemDTO> itemDtos = cart.getItems().stream().map(item -> {
-	        PerfumeVariant v = item.getPerfumeVariant();
-	        Perfume p = v.getPerfume();
-	        
-	        // Real qiyməti tapırıq (Endirim 0-dan böyükdürsə onu götür)
-	        Double effectivePrice = (v.getDiscountPrice() != null && v.getDiscountPrice() > 0) 
-	                                ? v.getDiscountPrice() 
-	                                : v.getPrice();
+		List<CartItemDTO> itemDtos = cart.getItems().stream().map(item -> {
+			PerfumeVariant v = item.getPerfumeVariant();
+			Perfume p = v.getPerfume();
 
-	        return new CartItemDTO(
-	            item.getId(),       // cartItemId
-	            p.getId(),          // perfumeId
-	            v.getId(),          // variantId
-	            p.getName(),
-	            p.getBrand(),
-	            v.getMl(),          // Ölçü (30, 50, 100...)
-	            v.getPrice(),       // Orijinal qiymət
-	            v.getDiscountPrice(),// Endirimli qiymət
-	            item.getQuantity(),
-	            effectivePrice * item.getQuantity(), // Alt cəm
-	            p.getImageUrl()
-	        );
-	    }).toList();
+			Double effectivePrice = (v.getDiscountPrice() != null && v.getDiscountPrice() > 0) ? v.getDiscountPrice()
+					: v.getPrice();
 
-	    Double total = itemDtos.stream().mapToDouble(CartItemDTO::getSubTotal).sum();
+			return new CartItemDTO(item.getId(), 
+					p.getId(), 
+					v.getId(), 
+					p.getName(), p.getBrand(), v.getMl(), 
+					v.getPrice(), 
+					v.getDiscountPrice(), 
+					item.getQuantity(), effectivePrice * item.getQuantity(), 
+					p.getImageUrl());
+		}).toList();
 
-	    CartDTO cartDto = new CartDTO();
-	    cartDto.setItems(itemDtos);
-	    cartDto.setTotalAmount(total);
-	    return cartDto;
+		Double total = itemDtos.stream().mapToDouble(CartItemDTO::getSubTotal).sum();
+
+		CartDTO cartDto = new CartDTO();
+		cartDto.setItems(itemDtos);
+		cartDto.setTotalAmount(total);
+		return cartDto;
 	}
 
 	@Transactional
@@ -113,5 +110,13 @@ public class CartService {
 		}
 
 		itemRepository.delete(item);
+	}
+
+	// YENİ: Səbətdəki sətir sayını (neçə növ məhsul) qaytaran metod
+	public int getCartCount() {
+		User user = userService.getCurrentUser();
+		return cartRepository.findByUser(user)
+				.map(cart -> cart.getItems().size()) // Burada sətir sayını (növ) alırıq
+				.orElse(0);
 	}
 }
