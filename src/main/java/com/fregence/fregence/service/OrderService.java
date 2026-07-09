@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -39,7 +40,7 @@ public class OrderService {
     @Autowired private CartRepository cartRepository;
     @Autowired private UserService userService;
 
-    // 1. SİFARİŞ YARATMAQ (Status: AWAITING_PAYMENT)
+    // 1. SİFARİŞ YARATMAQ (Status birbaşa PENDING olur)
     @Transactional
     public OrderResponseDTO placeOrder(String address, String phoneNumber, LocalDateTime preferredTime, String note) {
         User user = userService.getCurrentUser();
@@ -61,8 +62,8 @@ public class OrderService {
         order.setOrderNote(note);
         order.setOrderDate(LocalDateTime.now());
         
-        // YENİ: İlk status ödəniş gözlənilir olaraq təyin edilir
-        order.setStatus("AWAITING_PAYMENT");
+        // DÜZƏLİŞ: Artıq ödəniş gözləməsi yoxdur. Sifariş PENDING (Hazırlanır) olaraq yaranır.
+        order.setStatus("PENDING");
 
         List<OrderItem> orderItems = new ArrayList<>();
         double total = 0;
@@ -74,6 +75,7 @@ public class OrderService {
             if (variant.getStock() < cartItem.getQuantity()) {
                 throw new RuntimeException("Stok çatışmır: " + p.getName());
             }
+            
             variant.setStock(variant.getStock() - cartItem.getQuantity());
             variantRepository.save(variant);
 
@@ -98,6 +100,7 @@ public class OrderService {
         order.setTotalAmount(total);
         Order savedOrder = orderRepository.save(order);
 
+        // Bildirişlər
         try {
             telegramService.sendOrderNotification(savedOrder);
             messagingTemplate.convertAndSend("/topic/admin-notifications", "Yeni sifariş! #" + savedOrder.getId());
@@ -105,25 +108,14 @@ public class OrderService {
             System.err.println("Bildiriş xətası: " + e.getMessage());
         }
 
+        // Səbəti təmizləyirik
         cart.getItems().clear();
         cartRepository.save(cart);
 
         return convertToResponseDTO(savedOrder);
     }
 
-    // 2. ÖDƏNİŞİ TƏSDİQLƏMƏK (PaymentController üçün)
-    @Transactional
-    public void confirmPayment(Long orderId) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Sifariş tapılmadı"));
-        
-        if (order.getStatus().equals("AWAITING_PAYMENT")) {
-            order.setStatus("PAID");
-            orderRepository.save(order);
-        }
-    }
-
-    // 3. STATUS KEÇİD QAYDALARI (Validation)
+    // 2. STATUS YENİLƏMƏ (Sadələşdirilmiş)
     @Transactional
     public void updateOrderStatus(Long orderId, String newStatus) {
         Order order = orderRepository.findById(orderId).orElseThrow(() -> new RuntimeException("Sifariş tapılmadı"));
@@ -136,37 +128,32 @@ public class OrderService {
             throw new RuntimeException("Bu sifariş artıq yekunlaşıb, statusu dəyişdirilə bilməz.");
         }
 
-        // QAYDA: Ödənişi edilməmiş mal yola çıxa bilməz
-        if (current.equals("AWAITING_PAYMENT") && next.equals("SHIPPED")) {
-            throw new RuntimeException("Ödənişi tamamlanmamış sifariş kuryerə verilə bilməz!");
-        }
-
         order.setStatus(next);
         orderRepository.save(order);
     }
 
-    // 4. SOFT DELETE (Yumşaq Silmə)
+    // 3. ADMİN: KURYER TƏYİNİ (Yoxlanışsız - Dərhal işləyir)
     @Transactional
-    public void deleteOrder(Long orderId) {
+    public void shipOrder(Long orderId, String courierName, String courierPhone, LocalDateTime estimatedTime) {
         Order order = orderRepository.findById(orderId).orElseThrow(() -> new RuntimeException("Sifariş tapılmadı"));
-        
-        order.setDeleted(true); // Bazadan silmirik, sadəcə işarələyirik
-        order.setStatus("CANCELLED"); // Silinən sifarişi ləğv edilmiş kimi qeyd edirik
+
+        order.setStatus("SHIPPED");
+        order.setCourierName(courierName);
+        order.setCourierPhone(courierPhone);
+        order.setEstimatedDeliveryTime(estimatedTime);
         orderRepository.save(order);
     }
 
-    // 5. MÜŞTƏRİ TARİXÇƏSİ (Yalnız silinməyənlər)
-    public List<OrderResponseDTO> getMyOrders() {
-        User user = userService.getCurrentUser();
-        // Repository-də mütləq findByUserAndIsDeletedFalseOrderByOrderDateDesc metodu olmalıdır
-        return orderRepository.findByUserAndIsDeletedFalseOrderByOrderDateDesc(user)
-                .stream().map(this::convertToResponseDTO).toList();
-    }
-
-    // 6. ADMİN: BÜTÜN SİFARİŞLƏR (Silinməyənlər)
+    // 4. ADMİN: BÜTÜN SİFARİŞLƏR (Ən yeni yuxarıda)
     public PagedResponse<OrderResponseDTO> getAllOrdersForAdmin(Pageable pageable) {
-        // Repository-də findAllByIsDeletedFalse metodu olmalıdır
-        Page<Order> ordersPage = orderRepository.findAllByIsDeletedFalse(pageable);
+        // VACİB: Gələn pageable-a "orderDate DESC" sıralaması əlavə edirik.
+        Pageable sortedByDateDesc = PageRequest.of(
+                pageable.getPageNumber(), 
+                pageable.getPageSize(), 
+                Sort.by("orderDate").descending()
+        );
+
+        Page<Order> ordersPage = orderRepository.findAllByIsDeletedFalse(sortedByDateDesc);
         
         List<OrderResponseDTO> dtoList = ordersPage.getContent().stream()
                 .map(this::convertToResponseDTO)
@@ -182,7 +169,23 @@ public class OrderService {
         );
     }
 
-    // 7. ADMİN: FİLTİRLƏMƏ
+    // 5. MÜŞTƏRİ TARİXÇƏSİ
+    public List<OrderResponseDTO> getMyOrders() {
+        User user = userService.getCurrentUser();
+        return orderRepository.findByUserAndIsDeletedFalseOrderByOrderDateDesc(user)
+                .stream().map(this::convertToResponseDTO).toList();
+    }
+
+    // 6. SOFT DELETE
+    @Transactional
+    public void deleteOrder(Long orderId) {
+        Order order = orderRepository.findById(orderId).orElseThrow(() -> new RuntimeException("Sifariş tapılmadı"));
+        order.setDeleted(true);
+        order.setStatus("CANCELLED");
+        orderRepository.save(order);
+    }
+
+    // 7. FİLTİRLƏMƏ
     public PagedResponse<OrderResponseDTO> filterOrders(String customerName, Double minPrice, Double maxPrice,
             LocalDateTime startDate, LocalDateTime endDate, Pageable pageable) {
 
@@ -214,31 +217,13 @@ public class OrderService {
         );
     }
 
-    // ADMİN: KURYER TƏYİNİ (Təkmilləşdirilmiş)
-    @Transactional
-    public void shipOrder(Long orderId, String courierName, String courierPhone, LocalDateTime estimatedTime) {
-        Order order = orderRepository.findById(orderId).orElseThrow(() -> new RuntimeException("Sifariş tapılmadı"));
-
-        if (order.getStatus().equals("AWAITING_PAYMENT")) {
-            throw new RuntimeException("Ödənişi edilməmiş sifarişi kuryerə verə bilməzsiniz!");
-        }
-
-        order.setStatus("SHIPPED");
-        order.setCourierName(courierName);
-        order.setCourierPhone(courierPhone);
-        order.setEstimatedDeliveryTime(estimatedTime);
-        orderRepository.save(order);
-    }
-
     @Transactional
     public void deleteAllOrders() {
-        // Professional yanaşmada hamısını silmək əvəzinə hamısını Deleted etmək olar
         List<Order> all = orderRepository.findAll();
         all.forEach(o -> o.setDeleted(true));
         orderRepository.saveAll(all);
     }
 
-    // --- ENTITY -> DTO ÇEVİRMƏ ---
     private OrderResponseDTO convertToResponseDTO(Order order) {
         OrderResponseDTO dto = new OrderResponseDTO();
         dto.setId(order.getId());
